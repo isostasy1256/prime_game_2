@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5x5 素数ドラッグゲーム</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #edf3f5;
+      color: #17212b;
+      display: grid;
+      place-items: center;
+    }
+
+    .game {
+      width: min(94vw, 520px);
+      padding: 18px;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .status div {
+      background: white;
+      border: 1px solid #d7e0e7;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .label {
+      display: block;
+      color: #65717c;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .value {
+      font-size: 28px;
+      font-weight: 900;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid #d7e0e7;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 18px 45px rgba(20, 35, 45, 0.14);
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      background: #0f8f7d;
+      color: white;
+      font: inherit;
+      font-weight: 800;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0a6f62;
+    }
+
+    .preview {
+      min-height: 54px;
+      background: #f7fafb;
+      border: 1px solid #d7e0e7;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+    }
+
+    #currentNumber {
+      font-size: 24px;
+      overflow-wrap: anywhere;
+    }
+
+    #multiplier {
+      color: #65717c;
+      white-space: nowrap;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .tile {
+      aspect-ratio: 1;
+      border: 1px solid #d7e0e7;
+      border-radius: 8px;
+      background: #f5f8fa;
+      color: #17212b;
+      display: grid;
+      place-items: center;
+      font-size: clamp(28px, 10vw, 48px);
+      font-weight: 900;
+    }
+
+    .tile.selected {
+      background: #0f8f7d;
+      color: white;
+      border-color: #0a6f62;
+    }
+
+    .tile.last {
+      background: #f3bd3e;
+      color: #2d2110;
+      border-color: #d59b16;
+    }
+
+    .message {
+      min-height: 32px;
+      margin-top: 12px;
+      text-align: center;
+      font-weight: 800;
+      color: #65717c;
+    }
+
+    .message.success {
+      color: #0a6f62;
+    }
+
+    .message.fail {
+      color: #c33b32;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 18, 28, 0.58);
+      display: none;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .overlay.show {
+      display: grid;
+    }
+
+    .dialog {
+      width: min(100%, 340px);
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .dialog h2 {
+      margin: 0 0 10px;
+      font-size: 28px;
+    }
+
+    .final-score {
+      font-size: 32px;
+      font-weight: 900;
+      margin: 12px 0 18px;
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <section class="status">
+      <div>
+        <span class="label">TIME</span>
+        <span id="time" class="value">60</span>
+      </div>
+      <div>
+        <span class="label">SCORE</span>
+        <span id="score" class="value">0</span>
+      </div>
+      <div>
+        <span class="label">COMBO</span>
+        <span id="combo" class="value">0</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="head">
+        <h1>5x5 素数ドラッグ</h1>
+        <button id="restart">もう一度</button>
+      </div>
+
+      <div class="preview">
+        <span id="currentNumber">ドラッグで数字をつなげる</span>
+        <span id="multiplier">倍率 1.00x</span>
+      </div>
+
+      <div id="board" class="board"></div>
+
+      <div id="message" class="message">
+        上下左右に隣り合うマスだけつなげられます
+      </div>
+    </section>
+  </main>
+
+  <div id="overlay" class="overlay">
+    <div class="dialog">
+      <h2>タイムアップ</h2>
+      <div class="final-score"><span id="finalScore">0</span> 点</div>
+      <button id="restart2">もう一度プレイ</button>
+    </div>
+  </div>
+
+  <script>
+    const SIZE = 5;
+    const LIMIT = 60;
+
+    const board = document.getElementById("board");
+    const timeEl = document.getElementById("time");
+    const scoreEl = document.getElementById("score");
+    const comboEl = document.getElementById("combo");
+    const currentNumberEl = document.getElementById("currentNumber");
+    const multiplierEl = document.getElementById("multiplier");
+    const messageEl = document.getElementById("message");
+    const overlay = document.getElementById("overlay");
+    const finalScoreEl = document.getElementById("finalScore");
+
+    let numbers = [];
+    let selected = [];
+    let dragging = false;
+    let score = 0;
+    let combo = 0;
+    let timeLeft = LIMIT;
+    let timer = null;
+    let active = true;
+
+    function randomDigit() {
+      return Math.floor(Math.random() * 10);
+    }
+
+    function makeBoard() {
+      numbers = Array.from({ length: SIZE * SIZE }, randomDigit);
+    }
+
+    function render() {
+      board.innerHTML = "";
+
+      numbers.forEach((num, index) => {
+        const tile = document.createElement("button");
+        tile.className = "tile";
+        tile.textContent = num;
+        tile.dataset.index = index;
+        board.appendChild(tile);
+      });
+
+      paintSelected();
+    }
+
+    function paintSelected() {
+      document.querySelectorAll(".tile").forEach(tile => {
+        const index = Number(tile.dataset.index);
+        tile.classList.toggle("selected", selected.includes(index));
+        tile.classList.toggle("last", selected[selected.length - 1] === index);
+      });
+
+      currentNumberEl.textContent =
+        selected.length === 0
+          ? active ? "ドラッグで数字をつなげる" : "タイムアップ"
+          : selected.map(i => numbers[i]).join("");
+    }
+
+    function isNextTo(a, b) {
+      const ax = a % SIZE;
+      const ay = Math.floor(a / SIZE);
+      const bx = b % SIZE;
+      const by = Math.floor(b / SIZE);
+
+      return Math.abs(ax - bx) + Math.abs(ay - by) === 1;
+    }
+
+    function isPrime(n) {
+      if (n < 2) return false;
+      if (n === 2) return true;
+      if (n % 2 === 0) return false;
+
+      for (let i = 3; i <= Math.sqrt(n); i += 2) {
+        if (n % i === 0) return false;
+      }
+
+      return true;
+    }
+
+    function multiplierFor(comboCount) {
+      return 1 + (comboCount - 1) * 0.05;
+    }
+
+    function updateStatus() {
+      timeEl.textContent = timeLeft;
+      scoreEl.textContent = score.toLocaleString();
+      comboEl.textContent = combo;
+      multiplierEl.textContent = `倍率 ${multiplierFor(combo + 1).toFixed(2)}x`;
+    }
+
+    function setMessage(text, type = "") {
+      messageEl.textContent = text;
+      messageEl.className = `message ${type}`;
+    }
+
+    function indexFromPointer(event) {
+      const el = document.elementFromPoint(event.clientX, event.clientY);
+      const tile = el?.closest(".tile");
+      return tile ? Number(tile.dataset.index) : null;
+    }
+
+    function addIndex(index) {
+      if (index === null || !active) return;
+
+      const last = selected[selected.length - 1];
+      const alreadyIndex = selected.indexOf(index);
+
+      if (alreadyIndex === selected.length - 2) {
+        selected.pop();
+        paintSelected();
+        return;
+      }
+
+      if (selected.includes(index)) return;
+      if (last !== undefined && !isNextTo(last, index)) return;
+
+      selected.push(index);
+      paintSelected();
+    }
+
+    function startDrag(event) {
+      if (!active) return;
+
+      event.preventDefault();
+      dragging = true;
+      selected = [];
+      addIndex(indexFromPointer(event));
+    }
+
+    function moveDrag(event) {
+      if (!dragging || !active) return;
+
+      event.preventDefault();
+      addIndex(indexFromPointer(event));
+    }
+
+    function endDrag() {
+      if (!dragging || !active) return;
+
+      dragging = false;
+
+      if (selected.length === 0) return;
+
+      const text = selected.map(i => numbers[i]).join("");
+      const value = Number(text);
+
+      if (isPrime(value)) {
+        combo++;
+
+        const multiplier = multiplierFor(combo);
+        const addScore = Math.floor(value * multiplier);
+
+        score += addScore;
+
+        selected.forEach(index => {
+          numbers[index] = randomDigit();
+        });
+
+        setMessage(`${text} は素数！ +${addScore.toLocaleString()} 点`, "success");
+        selected = [];
+        render();
+      } else {
+        combo = 0;
+        setMessage(`${text} は素数ではありません`, "fail");
+        selected = [];
+        paintSelected();
+      }
+
+      updateStatus();
+    }
+
+    function endGame() {
+      active = false;
+      clearInterval(timer);
+      finalScoreEl.textContent = score.toLocaleString();
+      overlay.classList.add("show");
+      paintSelected();
+    }
+
+    function tick() {
+      timeLeft--;
+      updateStatus();
+
+      if (timeLeft <= 0) {
+        endGame();
+      }
+    }
+
+    function restartGame() {
+      score = 0;
+      combo = 0;
+      timeLeft = LIMIT;
+      selected = [];
+      dragging = false;
+      active = true;
+
+      overlay.classList.remove("show");
+      makeBoard();
+      render();
+      updateStatus();
+      setMessage("上下左右に隣り合うマスだけつなげられます");
+
+      clearInterval(timer);
+      timer = setInterval(tick, 1000);
+    }
+
+    board.addEventListener("pointerdown", startDrag);
+    board.addEventListener("pointermove", moveDrag);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+
+    document.getElementById("restart").addEventListener("click", restartGame);
+    document.getElementById("restart2").addEventListener("click", restartGame);
+
+    restartGame();
+  </script>
+</body>
+</html>
