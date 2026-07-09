@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>素数麻雀 - テストプレイ環境 (2飜縛り版)</title>
+    <title>素数麻雀 - テストプレイ環境 (挿入ソート版)</title>
     <style>
         body {
             background-color: #222;
@@ -52,7 +52,7 @@
             align-items: center;
         }
         
-        /*牌のデザイン*/
+        /* 牌のデザイン */
         .tile {
             width: 45px;
             height: 65px;
@@ -184,10 +184,11 @@
 </head>
 <body>
 
-<h1>素数麻雀 テスト卓 (2飜縛り＆立直制限版)</h1>
-<p>ルール：3桁の素数で順子！【2飜縛り：立直以外の役がない状態でのリーチは禁止です】</p>
+<h1>素数麻雀 テスト卓 (直感ソート＆2飜縛り版)</h1>
+<p>ルール：3桁の素数で順子！【操作：ドラッグで牌の間に挿入 / ダブルクリックで打牌】</p>
 
 <div id="game-container">
+    <!-- CPU Area -->
     <div class="area">
         <div class="area-title">CPU河</div>
         <div id="cpu-river" class="river"></div>
@@ -195,6 +196,7 @@
         <div id="cpu-hand" class="hand"></div>
     </div>
 
+    <!-- Info Panel -->
     <div id="info-panel">
         <div>
             <div>場風: 東局 (あなた: 親) <span style="color:#ff5722; font-weight:bold; margin-left:10px;">⚠️ 2飜縛り</span></div>
@@ -206,16 +208,18 @@
         <div id="status-text" style="color: #ffeb3b; max-width: 400px; font-size: 14px;">あなたの番です。</div>
     </div>
 
+    <!-- Player Area -->
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
-        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (ドラッグで並び替え / ダブルクリックで打牌)</div>
+        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (狙った牌の隙間にドロップして並び替え)</div>
         <div style="display:flex; align-items:flex-end;">
             <div id="player-hand" class="hand"></div>
             <div id="player-melds" class="hand" style="margin-left:10px;"></div>
         </div>
     </div>
 
+    <!-- Controls -->
     <div id="controls">
         <button id="btn-tsumo" disabled onclick="actionTsumo()">ツモ</button>
         <button id="btn-ron" disabled onclick="actionRon()">ロン</button>
@@ -225,6 +229,7 @@
         <button id="btn-pass" disabled onclick="actionPass()">パス</button>
     </div>
 
+    <!-- Result Screen -->
     <div id="result-screen">
         <div id="result-content">
             <h2 id="result-title" style="color:#ffeb3b;">和了！</h2>
@@ -255,7 +260,7 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- ドラッグ＆ドロップ ---
+// --- ドラッグ＆ドロップ (挿入ソート仕様) ---
 let draggedTileIndex = null;
 
 function addDragAndDropListeners() {
@@ -291,6 +296,7 @@ function handleDragEnter(e) {
 
 function handleDragLeave(e) { this.classList.remove('drag-over'); }
 
+// 🀫 【更新】入れ替えではなく、牌の「間」に挿入するロジック
 function handleDrop(e) {
     e.stopPropagation();
     if (draggedTileIndex === null) return;
@@ -300,9 +306,11 @@ function handleDrop(e) {
         const sourceIdx = parseInt(draggedTileIndex);
         const targetIdx = parseInt(targetTileIndex);
 
-        const temp = playerHand[sourceIdx];
-        playerHand[sourceIdx] = playerHand[targetIdx];
-        playerHand[targetIdx] = temp;
+        // 1. ドラッグした牌を元の位置から1枚抜き出す
+        const [draggedTile] = playerHand.splice(sourceIdx, 1);
+        
+        // 2. ドロップ先のインデックス位置に直接挿入（これで周りが綺麗に押し出される）
+        playerHand.splice(targetIdx, 0, draggedTile);
 
         updateUI(); 
         checkPlayerTurnActions(); 
@@ -442,13 +450,8 @@ function checkHu(hand, melds = []) {
     return null;
 }
 
-// 🛠️ 【新設】純粋に飜数と役のリストだけをシミュレーション計算する共通関数
 function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
-    let yakuList = [];
-    let totalHan = 0;
-    let doubleYakumanCount = 0;
-    let yakumanCount = 0;
-
+    let yakuList = []; let totalHan = 0; let doubleYakumanCount = 0; let yakumanCount = 0;
     if (!huResult) return { totalHan: 0, yakuList: [], yakumanCount: 0, doubleYakumanCount: 0 };
     let sorted = sortHand([...hand]);
 
@@ -496,7 +499,6 @@ function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
             if (fonKoutsu === 4) { pDoubleYakuman++; pYaku.push("大四喜 (ダブル役満)"); }
             else if (fonKoutsu === 3 && fonHead) { pYakuman++; pYaku.push("小四喜 (役満)"); }
 
-            // 飜数条件
             if (isMenzen && isTsumo) { pHan += 1; pYaku.push("門前自摸 (1飜)"); }
             if (customIsRiichi) { pHan += 1; pYaku.push("立直 (1飜)"); }
             if (customIsRiichi && isIppatsu) { pHan += 1; pYaku.push("一発 (1飜)"); }
@@ -548,7 +550,6 @@ function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
                 }
             } else if (pHan > bestHan) { bestHan = pHan; bestYaku = pYaku; }
         });
-
         yakumanCount += patternYakuman; doubleYakumanCount += patternDoubleYakuman;
         totalHan += bestHan; yakuList = [...yakuList, ...bestYaku];
     }
@@ -581,7 +582,6 @@ function getTileText(code) {
     return val;
 }
 
-// 🀫 【更新】2飜縛りを満たせるアガリ牌だけを表示する待ち牌探索
 function updateMachiDisplay() {
     const machiBox = document.getElementById('machi-box');
     if (playerHand.length % 3 === 1) {
@@ -594,7 +594,6 @@ function updateMachiDisplay() {
             let testHand = [...playerHand, tile];
             let huResult = checkHu(testHand, playerMelds);
             if (huResult) {
-                // ツモ・ロンいずれかで2飜縛りを満たせるかチェック
                 let resTsumo = getHanAndYaku(testHand, huResult, true, isRiichi);
                 let resRon = getHanAndYaku(testHand, huResult, false, isRiichi);
                 if (resTsumo.yakumanCount > 0 || resTsumo.doubleYakumanCount > 0 || resTsumo.totalHan >= 2 ||
@@ -637,7 +636,6 @@ function updateUI() {
     document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
 }
 
-// 🀫 【更新】2飜縛りと、立直単体制限の制御
 function checkPlayerTurnActions() {
     let huResult = checkHu(playerHand, playerMelds);
     let canTsumo = false;
@@ -647,7 +645,6 @@ function checkPlayerTurnActions() {
     }
     document.getElementById('btn-tsumo').disabled = !canTsumo;
 
-    // 🔍 制限ルール：どの牌を捨てても「立直以外の役」が残らないならリーチ不可
     let canRiichi = false;
     if (playerMelds.length === 0 && !isRiichi && playerHand.length === 14) {
         const allTiles = [];
@@ -656,13 +653,12 @@ function checkPlayerTurnActions() {
 
         for (let i = 0; i < playerHand.length; i++) {
             let tempHand = [...playerHand];
-            tempHand.splice(i, 1); // 1枚破棄してテンパイ想定の13枚にする
+            tempHand.splice(i, 1); 
             
             for (let tile of allTiles) {
                 let testHand = [...tempHand, tile];
                 let hr = checkHu(testHand, playerMelds);
                 if (hr) {
-                    // ロン想定（立直も自摸も乗らない状態）で1飜以上あれば「別役あり」とみなす
                     let resRon = getHanAndYaku(testHand, hr, false, false);
                     if (resRon.yakumanCount > 0 || resRon.doubleYakumanCount > 0 || resRon.totalHan >= 1) {
                         canRiichi = true; break;
@@ -709,7 +705,6 @@ function cpuTurn() {
     checkPlayerReaction(discardCard);
 }
 
-// 🀫 【更新】ロンボタンの活性化に2飜縛りを適用
 function checkPlayerReaction(card) {
     let fullHand = [...playerHand, card];
     let huResult = checkHu(fullHand, playerMelds);
@@ -794,7 +789,6 @@ function actionKan() {
 function actionTsumo() { let result = checkHu(playerHand, playerMelds); judgeYaku(result, true); }
 function actionRon() { let fullHand = [...playerHand, lastDiscardedCard]; let result = checkHu(fullHand, playerMelds); judgeYaku(result, false); }
 
-// 🀫 【更新】和了画面への結果出力を2飜ベースに最適化
 function judgeYaku(huResult, isTsumo) {
     if (!huResult) return;
     let handForJudge = isTsumo ? [...playerHand] : [...playerHand, lastDiscardedCard];
