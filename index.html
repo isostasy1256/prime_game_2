@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>素数麻雀 - テストプレイ環境 (手動理牌・修正版)</title>
+    <title>素数麻雀 - テストプレイ環境 (待ち牌表示版)</title>
     <style>
         body {
             background-color: #222;
@@ -51,45 +51,67 @@
             min-height: 70px;
             align-items: center;
         }
+        
+        /* --- 牌のシンプルなデザイン --- */
         .tile {
             width: 45px;
             height: 65px;
             background-color: #f5f5f5;
             border: 2px solid #ccc;
             border-radius: 5px;
-            color: #000;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            font-weight: bold;
-            font-size: 16px;
             cursor: grab;
             user-select: none;
             box-shadow: 2px 2px 3px rgba(0,0,0,0.3);
-            transition: transform 0.1s, border-color 0.1s;
+            transition: transform 0.1s, background-color 0.1s;
+            font-size: 28px;
+            font-weight: bold;
         }
-        .tile:active {
-            cursor: grabbing;
-        }
+        .tile:active { cursor: grabbing; }
         .tile:hover {
             transform: translateY(-5px);
             background-color: #fff;
         }
+        
+        /* 🎨 カラー指定（手牌・河用） */
+        .tile[data-suit="m"] { color: #e53935; } 
+        .tile[data-suit="s"] { color: #4caf50; } 
+        .tile[data-suit="p"] { color: #1e88e5; } 
+        .tile[data-suit="z"] { color: #333333; } 
+        .tile[data-suit="z"][data-val="6"] { color: #4caf50; } /* 發 */
+        .tile[data-suit="z"][data-val="7"] { color: #e53935; } /* 中 */
+
+        /* 🀫 新しく追加：待ち牌表示用のミニ牌デザイン */
+        .machi-tile {
+            width: 32px;
+            height: 46px;
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .machi-tile[data-suit="m"] { color: #e53935; }
+        .machi-tile[data-suit="s"] { color: #4caf50; }
+        .machi-tile[data-suit="p"] { color: #1e88e5; }
+        .machi-tile[data-suit="z"] { color: #333333; }
+        .machi-tile[data-suit="z"][data-val="6"] { color: #4caf50; }
+        .machi-tile[data-suit="z"][data-val="7"] { color: #e53935; }
+
+        /* CPUの伏せ牌 */
         .tile.cpu-back {
             background-color: #1565c0;
             border-color: #0d47a1;
-            color: transparent;
             cursor: default;
         }
-        .tile.cpu-back:hover { transform: none; }
+        .tile.cpu-back:hover { transform: none; background-color: #1565c0; }
         
-        /* 牌の柄別カラー */
-        .tile[data-suit="m"] { color: #d32f2f; } /* 萬子 */
-        .tile[data-suit="s"] { color: #388e3c; } /* 索子 */
-        .tile[data-suit="p"] { color: #1976d2; } /* 筒子 */
-        .tile[data-suit="z"] { color: #000000; } /* 字牌 */
-
         #controls {
             margin-top: 15px;
             display: flex;
@@ -116,7 +138,12 @@
             font-size: 16px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             width: 100%;
+            background-color: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 5px;
+            box-sizing: border-box;
         }
         #result-screen {
             position: absolute;
@@ -144,8 +171,6 @@
             border-left: 2px dashed #aaa;
             padding-left: 5px;
         }
-
-        /* --- ドラッグ時の視覚効果 --- */
         .tile.dragging {
             opacity: 0.4;
             border: 2px dashed #ffeb3b;
@@ -159,21 +184,26 @@
 </head>
 <body>
 
-<h1>素数麻雀 テスト卓 (1対1)</h1>
+<h1>素数麻雀 テスト卓 (シンプル・待ち牌表示版)</h1>
 <p>ルール：3つの数牌を並び替えて3桁の素数になれば順子！【操作：ドラッグで並び替え / ダブルクリックで打牌】</p>
 
 <div id="game-container">
     <div class="area">
         <div class="area-title">CPU河</div>
         <div id="cpu-river" class="river"></div>
-        <div class="area-title" style="margin-top:5px;">CPU手牌 (サンドバッグ)</div>
+        <div class="area-title" style="margin-top:5px;">CPU手牌</div>
         <div id="cpu-hand" class="hand"></div>
     </div>
 
     <div id="info-panel">
-        <div>場風: 東局 (あなた: 親)</div>
-        <div id="deck-count">山札残り: 136枚</div>
-        <div id="status-text" style="color: #ffeb3b;">あなたの番です。並び替えるか、牌をダブルクリックして捨ててください。</div>
+        <div>
+            <div>場風: 東局 (あなた: 親)</div>
+            <div id="deck-count" style="margin-top: 3px;">山札残り: 136枚</div>
+        </div>
+        <div id="machi-box" style="background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 4px; min-width: 200px;">
+            <div><strong>待ち牌:</strong> --</div>
+        </div>
+        <div id="status-text" style="color: #ffeb3b; max-width: 400px; font-size: 14px;">あなたの番です。</div>
     </div>
 
     <div class="area">
@@ -241,7 +271,7 @@ function addDragAndDropListeners() {
 }
 
 function handleDragStart(e) {
-    if (currentTurn !== 'player') return; // 自分のターン中ならいつでも並び替えOK
+    if (currentTurn !== 'player') return; 
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
     e.dataTransfer.setData('text/plain', draggedTileIndex);
@@ -272,13 +302,12 @@ function handleDrop(e) {
         const sourceIdx = parseInt(draggedTileIndex);
         const targetIdx = parseInt(targetTileIndex);
 
-        // 配列内の位置を入れ替える
         const temp = playerHand[sourceIdx];
         playerHand[sourceIdx] = playerHand[targetIdx];
         playerHand[targetIdx] = temp;
 
-        updateUI(); // 位置変更を画面に反映
-        checkPlayerTurnActions(); // 並び替え後にアガリボタンなどの状態を再チェック
+        updateUI(); 
+        checkPlayerTurnActions(); 
     }
     return false;
 }
@@ -437,48 +466,79 @@ function initGame() {
     cpuHand = deck.splice(0, 13);
     sortHand(playerHand);
     
+    document.getElementById('machi-box').innerHTML = '<div><strong>待ち牌:</strong> 打牌後に計算</div>';
     updateUI();
     checkPlayerTurnActions();
 }
 
-function getTileName(code) {
+function getTileText(code) {
     let suit = code[0];
     let val = code[1];
     if (suit === 'z') return ZI_NAMES[val];
-    return (suit === 'm' ? '萬' : suit === 's' ? '索' : '筒') + val;
+    return val;
+}
+
+// 🀫 新しく追加：プレイヤーの待ち牌を裏で全探索して表示する関数
+function updateMachiDisplay() {
+    const machiBox = document.getElementById('machi-box');
+    
+    // プレイヤーの手牌が「打牌した直後（13枚, 10枚, 7枚など3n+1枚）」のときだけ計算する
+    if (playerHand.length % 3 === 1) {
+        let machiList = [];
+        
+        // 全34種類の牌のリストを作成
+        const allTiles = [];
+        for (let suit of ['m', 's', 'p']) {
+            for (let i = 1; i <= 9; i++) allTiles.push(suit + i);
+        }
+        for (let i = 1; i <= 7; i++) allTiles.push('z' + i);
+
+        // 1枚ずつ足してみてアガれるか（Huになるか）チェック
+        for (let tile of allTiles) {
+            if (checkHu([...playerHand, tile], playerMelds)) {
+                machiList.push(tile);
+            }
+        }
+
+        // 待ち牌が存在すればテンパイ表示、なければノーテン表示
+        if (machiList.length > 0) {
+            let tilesHtml = machiList.map(c => `
+                <div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>
+            `).join('');
+            machiBox.innerHTML = `<div style="display:flex; align-items:center; gap:5px;"><strong>待ち牌:</strong> ${tilesHtml}</div>`;
+        } else {
+            machiBox.innerHTML = `<div><strong>待ち牌:</strong> なし（ノーテン）</div>`;
+        }
+    }
 }
 
 function updateUI() {
     document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
     
-    // プレイヤー手牌描画 (ondblclickに変更してドラッグの邪魔を防ぐ)
     let handHtml = '';
     playerHand.forEach((card, index) => {
-        handHtml += `<div class="tile" data-suit="${card[0]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileName(card)}</div>`;
+        handHtml += `<div class="tile" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileText(card)}</div>`;
     });
     document.getElementById('player-hand').innerHTML = handHtml;
 
-    // リスナーを再登録
     addDragAndDropListeners();
 
     let meldsHtml = '';
     playerMelds.forEach(m => {
         meldsHtml += `<div class="meld-container">`;
         m.cards.forEach(c => {
-            meldsHtml += `<div class="tile" data-suit="${c[0]}" style="cursor:default; transform:none;">${getTileName(c)}</div>`;
+            meldsHtml += `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`;
         });
         meldsHtml += `</div>`;
     });
     document.getElementById('player-melds').innerHTML = meldsHtml;
 
     let cpuHtml = '';
-    cpuHand.forEach(() => {
-        cpuHtml += `<div class="tile cpu-back">?</div>`;
-    });
+    cpuHand.forEach(() => { cpuHtml += `<div class="tile cpu-back"></div>`; });
     document.getElementById('cpu-hand').innerHTML = cpuHtml;
 
-    document.getElementById('player-river').innerHTML = playerRiver.map(c => `<div class="tile" data-suit="${c[0]}" style="cursor:default; transform:none;">${getTileName(c)}</div>`).join('');
-    document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" style="cursor:default; transform:none;">${getTileName(c)}</div>`).join('');
+    document.getElementById('player-river').innerHTML = playerRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
+    document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
 }
 
 function checkPlayerTurnActions() {
@@ -488,16 +548,11 @@ function checkPlayerTurnActions() {
     
     let canKan = false;
     let unique = [...new Set(playerHand)];
-    unique.forEach(c => {
-        if (countInArray(playerHand, c) === 4) canKan = true; 
-    });
-    playerMelds.forEach(m => {
-        if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; 
-    });
+    unique.forEach(c => { if (countInArray(playerHand, c) === 4) canKan = true; });
+    playerMelds.forEach(m => { if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; });
     document.getElementById('btn-kan').disabled = !canKan;
 }
 
-// プレイヤーが手牌を「ダブルクリック」して捨てる
 function playerDiscard(index) {
     if (currentTurn !== 'player' || playerHand.length % 3 !== 2) return;
     
@@ -506,8 +561,8 @@ function playerDiscard(index) {
     lastDiscardedCard = card;
     isIppatsu = false; 
     
-    // 捨てた後は自動で理牌せず、現在の並び順を維持して詰める
     updateUI();
+    updateMachiDisplay(); // 🀫 牌を捨てて13枚になった瞬間に待ち牌表示を更新
     
     disableAllButtons();
     currentTurn = 'cpu';
@@ -551,7 +606,7 @@ function playerTsumo() {
     if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     currentTurn = 'player';
     let card = deck.splice(0, 1)[0];
-    playerHand.push(card); // ツモ牌は一番右端に入る
+    playerHand.push(card); 
     lastDrawCard = card;
     turnCount++;
     
@@ -559,6 +614,9 @@ function playerTsumo() {
     updateUI();
     checkPlayerTurnActions();
     
+    // ※ ここでは updateMachiDisplay をあえて呼ばないことで、
+    // 直前の捨て牌時の待ち表示を維持し「待ち牌をツモれたかどうか」を見やすくしています。
+
     if (isRiichi && document.getElementById('btn-tsumo').disabled) {
         setTimeout(() => {
             let idx = playerHand.indexOf(card);
