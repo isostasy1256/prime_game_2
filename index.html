@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>素数麻雀 - テストプレイ環境 (手動理牌版)</title>
+    <title>素数麻雀 - テストプレイ環境 (手動理牌・修正版)</title>
     <style>
         body {
             background-color: #222;
@@ -64,10 +64,13 @@
             align-items: center;
             font-weight: bold;
             font-size: 16px;
-            cursor: pointer;
+            cursor: grab;
             user-select: none;
             box-shadow: 2px 2px 3px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
+            transition: transform 0.1s, border-color 0.1s;
+        }
+        .tile:active {
+            cursor: grabbing;
         }
         .tile:hover {
             transform: translateY(-5px);
@@ -142,20 +145,22 @@
             padding-left: 5px;
         }
 
-        /* --- Drag and Drop State Stylings --- */
+        /* --- ドラッグ時の視覚効果 --- */
         .tile.dragging {
-            opacity: 0.5;
+            opacity: 0.4;
+            border: 2px dashed #ffeb3b;
         }
         .tile.drag-over {
-            border: 2px dashed #4caf50;
-            transform: scale(1.05);
+            border: 2px solid #ffeb3b;
+            background-color: #fffdec;
+            transform: scale(1.05) translateY(-5px);
         }
     </style>
 </head>
 <body>
 
 <h1>素数麻雀 テスト卓 (1対1)</h1>
-<p>ルール：3つの数牌を並び替えて3桁の素数になれば順子！CPUは完全サンドバッグです。</p>
+<p>ルール：3つの数牌を並び替えて3桁の素数になれば順子！【操作：ドラッグで並び替え / ダブルクリックで打牌】</p>
 
 <div id="game-container">
     <div class="area">
@@ -168,13 +173,13 @@
     <div id="info-panel">
         <div>場風: 東局 (あなた: 親)</div>
         <div id="deck-count">山札残り: 136枚</div>
-        <div id="status-text" style="color: #ffeb3b;">あなたの番です。牌を1枚クリックして捨ててください。</div>
+        <div id="status-text" style="color: #ffeb3b;">あなたの番です。並び替えるか、牌をダブルクリックして捨ててください。</div>
     </div>
 
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
-        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (ドラッグで並び替え可)</div>
+        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (ドラッグで自由に並び替え可能)</div>
         <div style="display:flex; align-items:flex-end;">
             <div id="player-hand" class="hand"></div>
             <div id="player-melds" class="hand" style="margin-left:10px;"></div>
@@ -202,12 +207,12 @@
 
 <script>
 // --- ゲームデータ定義 ---
-const SUITS = ['m', 's', 'p', 'z']; // 萬子, 索子, 筒子, 字牌
+const SUITS = ['m', 's', 'p', 'z']; 
 const ZI_NAMES = {1:'東', 2:'南', 3:'西', 4:'北', 5:'白', 6:'發', 7:'中'};
 
 let deck = [];
 let playerHand = [];
-let playerMelds = []; // 副露 {type: 'pon'|'kan', cards: []}
+let playerMelds = []; 
 let cpuHand = [];
 let playerRiver = [];
 let cpuRiver = [];
@@ -217,16 +222,14 @@ let isIppatsu = false;
 let turnCount = 0;
 let lastDrawCard = null;
 let lastDiscardedCard = null;
-let currentTurn = 'player'; // 'player' or 'cpu'
+let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- Drag and Drop Logic ---
+// --- ドラッグ＆ドロップ ロジック ---
 let draggedTileIndex = null;
-let isDragging = false;
 
 function addDragAndDropListeners() {
     const handTiles = document.querySelectorAll('#player-hand .tile');
-
     handTiles.forEach(tile => {
         tile.addEventListener('dragstart', handleDragStart);
         tile.addEventListener('dragover', handleDragOver);
@@ -238,8 +241,7 @@ function addDragAndDropListeners() {
 }
 
 function handleDragStart(e) {
-    if (currentTurn !== 'player' || playerHand.length % 3 === 2) return; // Discard turn or reaction turn.
-    isDragging = true;
+    if (currentTurn !== 'player') return; // 自分のターン中ならいつでも並び替えOK
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
     e.dataTransfer.setData('text/plain', draggedTileIndex);
@@ -247,15 +249,13 @@ function handleDragStart(e) {
 }
 
 function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault(); // Necessary. Allows us to drop.
-    }
+    if (e.preventDefault) e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     return false;
 }
 
 function handleDragEnter(e) {
-    if (this === document.querySelector(`.tile[data-index="${draggedTileIndex}"]`)) return;
+    if (this.getAttribute('data-index') === draggedTileIndex) return;
     this.classList.add('drag-over');
 }
 
@@ -264,29 +264,28 @@ function handleDragLeave(e) {
 }
 
 function handleDrop(e) {
-    e.stopPropagation(); // Stops some browsers from redirecting.
+    e.stopPropagation();
     if (draggedTileIndex === null) return;
     const targetTileIndex = this.getAttribute('data-index');
 
     if (draggedTileIndex !== targetTileIndex) {
-        // Swap the tiles in the playerHand array
-        const draggedIndexNum = parseInt(draggedTileIndex);
-        const targetIndexNum = parseInt(targetTileIndex);
+        const sourceIdx = parseInt(draggedTileIndex);
+        const targetIdx = parseInt(targetTileIndex);
 
-        const temp = playerHand[draggedIndexNum];
-        playerHand[draggedIndexNum] = playerHand[targetIndexNum];
-        playerHand[targetIndexNum] = temp;
+        // 配列内の位置を入れ替える
+        const temp = playerHand[sourceIdx];
+        playerHand[sourceIdx] = playerHand[targetIdx];
+        playerHand[targetIdx] = temp;
 
-        updateUI(); // Re-render to reflect the change
+        updateUI(); // 位置変更を画面に反映
+        checkPlayerTurnActions(); // 並び替え後にアガリボタンなどの状態を再チェック
     }
     return false;
 }
 
 function handleDragEnd(e) {
-    isDragging = false;
     this.classList.remove('dragging');
-    const handTiles = document.querySelectorAll('#player-hand .tile');
-    handTiles.forEach(tile => {
+    document.querySelectorAll('#player-hand .tile').forEach(tile => {
         tile.classList.remove('drag-over');
     });
     draggedTileIndex = null;
@@ -301,10 +300,9 @@ function isPrime(num) {
     return true;
 }
 
-// 3枚の数牌が素数順子を形成できるか
 function checkPrimeShuntsu(c1, c2, c3) {
     if (c1[0] === 'z' || c2[0] === 'z' || c3[0] === 'z') return false;
-    if (c1[0] !== c2[0] || c2[0] !== c3[0]) return false; // 同じ柄であること
+    if (c1[0] !== c2[0] || c2[0] !== c3[0]) return false; 
     
     let v1 = parseInt(c1[1]), v2 = parseInt(c2[1]), v3 = parseInt(c3[1]);
     let permutations = [
@@ -315,7 +313,6 @@ function checkPrimeShuntsu(c1, c2, c3) {
     return permutations.some(n => isPrime(n));
 }
 
-// 二素七対子の判定 (2桁素数になる数牌ペア×7)
 function checkNiSoChitoi(cards) {
     if (cards.length === 0) return true;
     let first = cards[0];
@@ -349,13 +346,11 @@ function countInArray(arr, val) {
     return arr.filter(item => item === val).length;
 }
 
-// 通常面子の全分解パターン取得
 function getNormalMelds(cards) {
     if (cards.length === 0) return [[]];
     let first = cards[0];
     let results = [];
     
-    // 1. 刻子として抜く
     if (countInArray(cards, first) >= 3) {
         let next = [...cards];
         next.splice(next.indexOf(first), 1);
@@ -365,7 +360,6 @@ function getNormalMelds(cards) {
         for (let s of subs) results.push([{type:'koutsu', cards:[first, first, first]}, ...s]);
     }
     
-    // 2. 素数順子として抜く
     if (first[0] !== 'z') {
         let type = first[0];
         let sameTypeIndices = [];
@@ -389,11 +383,9 @@ function getNormalMelds(cards) {
     return results;
 }
 
-// 総合アガリチェック
 function checkHu(hand, melds = []) {
     let sorted = sortHand([...hand]);
     
-    // 国士無双判定
     const kokushiTiles = ['m1','m9','s1','s9','p1','p9','z1','z2','z3','z4','z5','z6','z7'];
     let isKokushi = sorted.length === 14 && melds.length === 0 && kokushiTiles.every(t => sorted.includes(t));
     if (isKokushi) {
@@ -403,7 +395,6 @@ function checkHu(hand, melds = []) {
         return { type: is13 ? 'kokushi13' : 'kokushi', meldPatterns: [] };
     }
     
-    // 七対子・二素七対子判定
     if (sorted.length === 14 && melds.length === 0) {
         let counts = {};
         for(let t of sorted) counts[t] = (counts[t]||0)+1;
@@ -411,7 +402,6 @@ function checkHu(hand, melds = []) {
         if (checkNiSoChitoi(sorted)) return { type: 'niso_chitoitsu', meldPatterns: [] };
     }
     
-    // 通常手（4面子1雀頭）判定
     let uniqueCards = [...new Set(sorted)];
     for (let head of uniqueCards) {
         if (countInArray(sorted, head) >= 2) {
@@ -421,7 +411,6 @@ function checkHu(hand, melds = []) {
             
             let patterns = getNormalMelds(remain);
             if (patterns.length > 0) {
-                // 鳴き牌の面子を合流させる
                 let completePatterns = patterns.map(p => [...p, ...melds.map(m => ({type: m.type==='pon'?'koutsu':'kantsu', cards: m.cards}))]);
                 return { type: 'normal', head: head, patterns: completePatterns };
             }
@@ -433,20 +422,17 @@ function checkHu(hand, melds = []) {
 // --- ゲーム進行システム ---
 function initGame() {
     deck = [];
-    // 牌山の作成 (各4枚)
     for (let suit of SUITS) {
         let max = suit === 'z' ? 7 : 9;
         for (let i = 1; i <= max; i++) {
             for (let k = 0; k < 4; k++) deck.push(suit + i);
         }
     }
-    // シャッフル
     for (let i = deck.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];
     }
 
-    // 配牌 (プレイヤー親なので14枚、CPU13枚)
     playerHand = deck.splice(0, 14);
     cpuHand = deck.splice(0, 13);
     sortHand(playerHand);
@@ -459,24 +445,22 @@ function getTileName(code) {
     let suit = code[0];
     let val = code[1];
     if (suit === 'z') return ZI_NAMES[val];
-    let suitName = suit === 'm' ? '萬' : suit === 's' ? '索' : '筒';
-    return suitName + val;
+    return (suit === 'm' ? '萬' : suit === 's' ? '索' : '筒') + val;
 }
 
 function updateUI() {
     document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
     
-    // プレイヤー手牌描画
+    // プレイヤー手牌描画 (ondblclickに変更してドラッグの邪魔を防ぐ)
     let handHtml = '';
     playerHand.forEach((card, index) => {
-        handHtml += `<div class="tile" data-suit="${card[0]}" data-index="${index}" draggable="true" onclick="playerDiscard(${index})">${getTileName(card)}</div>`;
+        handHtml += `<div class="tile" data-suit="${card[0]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileName(card)}</div>`;
     });
     document.getElementById('player-hand').innerHTML = handHtml;
 
-    // Add drag-and-drop listeners to the newly generated tiles
+    // リスナーを再登録
     addDragAndDropListeners();
 
-    // プレイヤー副露描画
     let meldsHtml = '';
     playerMelds.forEach(m => {
         meldsHtml += `<div class="meld-container">`;
@@ -487,53 +471,45 @@ function updateUI() {
     });
     document.getElementById('player-melds').innerHTML = meldsHtml;
 
-    // CPU手牌描画（裏向き）
     let cpuHtml = '';
     cpuHand.forEach(() => {
         cpuHtml += `<div class="tile cpu-back">?</div>`;
     });
     document.getElementById('cpu-hand').innerHTML = cpuHtml;
 
-    // 河描画
     document.getElementById('player-river').innerHTML = playerRiver.map(c => `<div class="tile" data-suit="${c[0]}" style="cursor:default; transform:none;">${getTileName(c)}</div>`).join('');
     document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" style="cursor:default; transform:none;">${getTileName(c)}</div>`).join('');
 }
 
-// プレイヤーのツモ番時のボタン有効化チェック
 function checkPlayerTurnActions() {
     let huResult = checkHu(playerHand, playerMelds);
     document.getElementById('btn-tsumo').disabled = !huResult;
-    
-    // リーチ判定（門前かつ14枚時）
     document.getElementById('btn-riichi').disabled = (playerMelds.length > 0 || isRiichi || playerHand.length !== 14);
     
-    // 暗槓・加槓チェック
     let canKan = false;
     let unique = [...new Set(playerHand)];
     unique.forEach(c => {
-        if (countInArray(playerHand, c) === 4) canKan = true; // 暗槓
+        if (countInArray(playerHand, c) === 4) canKan = true; 
     });
     playerMelds.forEach(m => {
-        if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; // 加槓
+        if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; 
     });
     document.getElementById('btn-kan').disabled = !canKan;
 }
 
-// プレイヤーが手牌をクリックして捨てる
+// プレイヤーが手牌を「ダブルクリック」して捨てる
 function playerDiscard(index) {
-    if (currentTurn !== 'player' || playerHand.length % 3 !== 2 || isDragging) return;
+    if (currentTurn !== 'player' || playerHand.length % 3 !== 2) return;
     
     let card = playerHand.splice(index, 1)[0];
     playerRiver.push(card);
     lastDiscardedCard = card;
-    isIppatsu = false; // 誰かが打牌したら一発は消える
-    sortHand(playerHand);
+    isIppatsu = false; 
+    
+    // 捨てた後は自動で理牌せず、現在の並び順を維持して詰める
     updateUI();
     
-    // ボタン全消灯
     disableAllButtons();
-    
-    // CPUのターンへ移行
     currentTurn = 'cpu';
     document.getElementById('status-text').innerText = "CPUが思考中...";
     setTimeout(cpuTurn, 800);
@@ -542,25 +518,22 @@ function playerDiscard(index) {
 function cpuTurn() {
     if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     
-    // CPUツモ
     let tsumo = deck.splice(0, 1)[0];
     cpuHand.push(tsumo);
     
-    // 完全ランダム切り
     let discardIdx = Math.floor(Math.random() * cpuHand.length);
     let discardCard = cpuHand.splice(discardIdx, 1)[0];
     cpuRiver.push(discardCard);
     lastDiscardedCard = discardCard;
     updateUI();
 
-    // プレイヤーのロン・ポン・カン判定
     checkPlayerReaction(discardCard);
 }
 
 function checkPlayerReaction(card) {
     let canRon = checkHu([...playerHand, card], playerMelds);
     let canPon = countInArray(playerHand, card) >= 2;
-    let canKan = countInArray(playerHand, card) === 3; // 大明槓
+    let canKan = countInArray(playerHand, card) === 3; 
 
     document.getElementById('btn-ron').disabled = !canRon;
     document.getElementById('btn-pon').disabled = !canPon;
@@ -570,7 +543,6 @@ function checkPlayerReaction(card) {
         document.getElementById('btn-pass').disabled = false;
         document.getElementById('status-text').innerText = "CPUの捨て牌に対してアクション可能です。";
     } else {
-        // 何もなければプレイヤーのツモ番へ
         setTimeout(playerTsumo, 600);
     }
 }
@@ -579,15 +551,14 @@ function playerTsumo() {
     if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     currentTurn = 'player';
     let card = deck.splice(0, 1)[0];
-    playerHand.push(card);
+    playerHand.push(card); // ツモ牌は一番右端に入る
     lastDrawCard = card;
     turnCount++;
     
-    document.getElementById('status-text').innerText = isRiichi ? "リーチ中...ツモボタンか牌をクリックしてツモ切りしてください。" : "あなたのツモ番です。";
+    document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたのツモ番です。牌の入れ替え、またはダブルクリックで打牌してください。";
     updateUI();
     checkPlayerTurnActions();
     
-    // リーチ自動ツモ切り（アガれない場合）
     if (isRiichi && document.getElementById('btn-tsumo').disabled) {
         setTimeout(() => {
             let idx = playerHand.indexOf(card);
@@ -602,7 +573,6 @@ function disableAllButtons() {
     });
 }
 
-// --- プレイヤーのアクション関数 ---
 function actionPass() {
     disableAllButtons();
     playerTsumo();
@@ -612,41 +582,35 @@ function actionRiichi() {
     isRiichi = true;
     isIppatsu = true;
     document.getElementById('btn-riichi').disabled = true;
-    document.getElementById('status-text').innerText = "リーチしました！牌を1枚捨ててください。";
+    document.getElementById('status-text').innerText = "リーチしました！牌をダブルクリックして1枚捨ててください。";
 }
 
 function actionPon() {
     disableAllButtons();
     let card = lastDiscardedCard;
-    // CPUの河から回収
     cpuRiver.pop();
-    // 手牌から2枚消費
     playerHand.splice(playerHand.indexOf(card), 1);
     playerHand.splice(playerHand.indexOf(card), 1);
     playerMelds.push({type: 'pon', cards: [card, card, card]});
     currentTurn = 'player';
     updateUI();
-    document.getElementById('status-text').innerText = "ポンしました。牌を1枚捨ててください。";
+    document.getElementById('status-text').innerText = "ポンしました。牌をダブルクリックして1枚捨ててください。";
 }
 
 function actionKan() {
     disableAllButtons();
     let card = lastDiscardedCard;
     if (currentTurn === 'cpu') {
-        // 大明槓
         cpuRiver.pop();
         playerHand.splice(playerHand.indexOf(card), 1);
         playerHand.splice(playerHand.indexOf(card), 1);
         playerHand.splice(playerHand.indexOf(card), 1);
         playerMelds.push({type: 'kan', cards: [card, card, card, card]});
     } else {
-        // 暗槓 または 加槓
         if (countInArray(playerHand, card) === 4) {
-            // 暗槓
             playerHand = playerHand.filter(c => c !== card);
             playerMelds.push({type: 'kan', cards: [card, card, card, card]});
         } else {
-            // 加槓
             playerHand.splice(playerHand.indexOf(card), 1);
             let targetMeld = playerMelds.find(m => m.type === 'pon' && m.cards[0] === card);
             targetMeld.type = 'kan';
@@ -654,7 +618,6 @@ function actionKan() {
         }
     }
     isRinshan = true;
-    // 嶺上ツモ
     if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     let rinshanCard = deck.splice(0, 1)[0];
     playerHand.push(rinshanCard);
@@ -676,36 +639,28 @@ function actionRon() {
     judgeYaku(result, false);
 }
 
-// --- 役判定・点数算出エンジン ---
 function judgeYaku(huResult, isTsumo) {
     let yakuList = [];
     let totalHan = 0;
-    let isYakuman = false;
     let doubleYakumanCount = 0;
     let yakumanCount = 0;
 
     if (!huResult) return;
 
-    // --- 特殊形役満の判定 ---
     if (huResult.type === 'kokushi13') { doubleYakumanCount++; yakuList.push("国士無双十三面待ち (ダブル役満)"); }
     else if (huResult.type === 'kokushi') { yakumanCount++; yakuList.push("国士無双 (役満)"); }
     
     if (huResult.type === 'niso_chitoitsu') { totalHan += 2; yakuList.push("二素七対子 (2飜)"); }
     if (huResult.type === 'chitoitsu') { totalHan += 2; yakuList.push("七対子 (2飜)"); }
 
-    // 天和・地和
-    if (turnCount === 1 && isTsumo) {
-        yakumanCount++; yakuList.push("天和 (役満)");
-    }
+    if (turnCount === 1 && isTsumo) { yakumanCount++; yakuList.push("天和 (役満)"); }
 
-    // --- 通常手（面子構造）の判定 ---
     if (huResult.type === 'normal') {
         let bestHan = -1;
         let bestYaku = [];
         let patternYakuman = 0;
         let patternDoubleYakuman = 0;
 
-        // 複数の面子分解パターンから最も高い役を採択
         huResult.patterns.forEach(pattern => {
             let pYaku = [];
             let pHan = 0;
@@ -716,35 +671,27 @@ function judgeYaku(huResult, isTsumo) {
             let koutsuCount = pattern.filter(m => m.type === 'koutsu').length;
             let kantsuCount = pattern.filter(m => m.type === 'kantsu').length;
             let totalAnkou = pattern.filter(m => (m.type === 'koutsu' || m.type === 'kantsu') && !playerMelds.some(pm => pm.cards[0] === m.cards[0])).length;
-
-            // 門前チェック
             let isMenzen = playerMelds.length === 0;
 
-            // 1. 素九蓮宝燈 (11123345678999の形のみ)
             if (isMenzen) {
                 let currentSuit = playerHand[0][0];
                 if (currentSuit !== 'z') {
                     let standardStr = "11123345678999";
-                    let handNums = playerHand.map(c => c[1]).sort().join('');
-                    if (handNums === standardStr) {
-                        pDoubleYakuman++; pYaku.push("素九蓮宝燈 (ダブル役満)");
-                    }
+                    let handNums = [...playerHand].map(c => c[1]).sort().join('');
+                    if (handNums === standardStr) { pDoubleYakuman++; pYaku.push("素九蓮宝燈 (ダブル役満)"); }
                 }
             }
 
-            // 2. 四素連星
             let shuntsuStrings = pattern.filter(m => m.type === 'shuntsu').map(m => m.cards.map(c => c[1]).sort().join(''));
-            let hasRen1 = ["128","328","728","928"].every(s => shuntsuStrings.includes(s)); // 821,823,827,829のソート文字
-            let hasRen2 = ["119","319","719","919"].every(s => shuntsuStrings.includes(s)); // 191,193,197,199のソート文字
+            let hasRen1 = ["128","328","728","928"].every(s => shuntsuStrings.includes(s)); 
+            let hasRen2 = ["119","319","719","919"].every(s => shuntsuStrings.includes(s)); 
             if ((hasRen1 || hasRen2) && ['1','3','7','9'].includes(huResult.head[1]) && huResult.head[0] !== 'z') {
                 pDoubleYakuman++; pYaku.push("四素連星 (ダブル役満)");
             }
 
-            // 3. 既存役満
             if (totalAnkou === 4) { pYakuman++; pYaku.push("四暗刻 (役満)"); }
             if (kantsuCount === 4) { pYakuman++; pYaku.push("四槓子 (役満)"); }
             
-            // 字一色 / 清老頭 / 大三元 / 大四喜 / 小四喜
             let allTiles = [...playerHand, ...playerMelds.flatMap(m => m.cards)];
             if (allTiles.every(c => c[0] === 'z')) { pYakuman++; pYaku.push("字一色 (役満)"); }
             if (allTiles.every(c => c[1] === '1' || c[1] === '9')) { pYakuman++; pYaku.push("清老頭 (役満)"); }
@@ -757,47 +704,34 @@ function judgeYaku(huResult, isTsumo) {
             if (fonKoutsu === 4) { pDoubleYakuman++; pYaku.push("大四喜 (ダブル役満)"); }
             else if (fonKoutsu === 3 && fonHead) { pYakuman++; pYaku.push("小四喜 (役満)"); }
 
-            // 4. 通常役
             if (isMenzen && isTsumo) { pHan += 1; pYaku.push("門前自摸 (1飜)"); }
             if (isRiichi) { pHan += 1; pYaku.push("立直 (1飜)"); }
             if (isIppatsu) { pHan += 1; pYaku.push("一発 (1飜)"); }
             if (isRinshan) { pHan += 1; pYaku.push("嶺上開花 (1飜)"); }
             if (deck.length === 0) { pHan += 1; pYaku.push(isTsumo ? "海底撈月 (1飜)" : "河底撈月 (1飜)"); }
-            
-            // タンヤオ
             if (allTiles.every(c => c[0] !== 'z' && c[1] !== '1' && c[1] !== '9')) { pHan += 1; pYaku.push("断幺九 (1飜)"); }
-            // ピンフ (刻子なし)
             if ((koutsuCount + kantsuCount) === 0 && isMenzen) { pHan += 1; pYaku.push("平和 (1飜)"); }
             
-            // 一盃口 / 二盃口
             let shuntsuCodes = pattern.filter(m => m.type === 'shuntsu').map(m => m.cards.sort().join(''));
             let uniqueShuntsu = [...new Set(shuntsuCodes)];
             let doubleShuntsuCount = 0;
-            uniqueShuntsu.forEach(sc => {
-                if (shuntsuCodes.filter(c => c === sc).length >= 2) doubleShuntsuCount++;
-            });
+            uniqueShuntsu.forEach(sc => { if (shuntsuCodes.filter(c => c === sc).length >= 2) doubleShuntsuCount++; });
             if (doubleShuntsuCount === 2 && isMenzen) { pHan += 3; pYaku.push("二盃口 (3飜)"); }
             else if (doubleShuntsuCount === 1 && isMenzen) { pHan += 1; pYaku.push("一盃口 (1飜)"); }
 
-            // 対々和 / 三暗刻
             if ((koutsuCount + kantsuCount) === 4 && !isMenzen) { pHan += 2; pYaku.push("対々和 (2飜)"); }
             if (totalAnkou === 3) { pHan += 2; pYaku.push("三暗刻 (2飜)"); }
             if (kantsuCount === 3) { pHan += 2; pYaku.push("三槓子 (2飜)"); }
 
-            // 三色同刻
             let koutsuHeads = pattern.filter(m => m.type === 'koutsu' || m.type === 'kantsu').map(m => m.cards[0]);
             let hasSanshokuKoutsu = false;
-            for(let num=1; num<=9; num++) {
-                if (koutsuHeads.includes('m'+num) && koutsuHeads.includes('s'+num) && koutsuHeads.includes('p'+num)) hasSanshokuKoutsu = true;
-            }
+            for(let num=1; num<=9; num++) { if (koutsuHeads.includes('m'+num) && koutsuHeads.includes('s'+num) && koutsuHeads.includes('p'+num)) hasSanshokuKoutsu = true; }
             if (hasSanshokuKoutsu) { pHan += 2; pYaku.push("三色同刻 (2飜)"); }
 
-            // 三色同順 (萬索筒で全く同じ数構成の素数順子)
             let shuntsuPatternsStr = pattern.filter(m => m.type === 'shuntsu').map(m => m.cards.map(c=>c[1]).sort().join(''));
             let hasSanshokuShuntsu = false;
             let uniquePatternsStr = [...new Set(shuntsuPatternsStr)];
             uniquePatternsStr.forEach(pStr => {
-                // その数構成がm, s, p全てに実在するかチェック
                 let hasM = pattern.some(m => m.type === 'shuntsu' && m.cards[0][0] === 'm' && m.cards.map(c=>c[1]).sort().join('') === pStr);
                 let hasS = pattern.some(m => m.type === 'shuntsu' && m.cards[0][0] === 's' && m.cards.map(c=>c[1]).sort().join('') === pStr);
                 let hasP = pattern.some(m => m.type === 'shuntsu' && m.cards[0][0] === 'p' && m.cards.map(c=>c[1]).sort().join('') === pStr);
@@ -805,23 +739,17 @@ function judgeYaku(huResult, isTsumo) {
             });
             if (hasSanshokuShuntsu) { pHan += 2; pYaku.push("三色同順 (2飜)"); }
 
-            // 清一色 / 混老頭
             let suitsPresent = new Set(allTiles.map(c => c[0]));
             if (suitsPresent.size === 1 && !suitsPresent.has('z')) { pHan += isMenzen ? 6 : 5; pYaku.push(`清一色 (${isMenzen?6:5}飜)`); }
             if (allTiles.every(c => c[0] === 'z' || c[1] === '1' || c[1] === '9')) { pHan += 2; pYaku.push("混老頭 (2飜)"); }
 
-            // 役牌 / 小三元
             let sangenNames = {5:"白", 6:"發", 7:"中"};
-            Object.keys(sangenNames).forEach(v => {
-                if (pattern.some(m => m.cards[0] === 'z'+v && (m.type==='koutsu'||m.type==='kantsu'))) { pHan += 1; pYaku.push(`役牌:${sangenNames[v]} (1飜)`); }
-            });
+            Object.keys(sangenNames).forEach(v => { if (pattern.some(m => m.cards[0] === 'z'+v && (m.type==='koutsu'||m.type==='kantsu'))) { pHan += 1; pYaku.push(`役牌:${sangenNames[v]} (1飜)`); } });
             if (sangenKoutsu === 2 && huResult.head.startsWith('z') && parseInt(huResult.head[1]) >= 5) { pHan += 2; pYaku.push("小三元 (2飜)"); }
 
-            // 緑一色判定 (索子の2,3,4,6,8 + 發(z6) のみ)
             const greenTiles = ['s2','s3','s4','s6','s8','z6'];
             if (allTiles.every(c => greenTiles.includes(c))) { pYakuman++; pYaku.push("緑一色 (役満)"); }
 
-            // 集計評価
             if (pDoubleYakuman > 0 || pYakuman > 0) {
                 if (pDoubleYakuman * 2 + pYakuman > patternDoubleYakuman * 2 + patternYakuman) {
                     patternDoubleYakuman = pDoubleYakuman;
@@ -840,7 +768,6 @@ function judgeYaku(huResult, isTsumo) {
         yakuList = [...yakuList, ...bestYaku];
     }
 
-    // --- 結果画面出力表示 ---
     if (doubleYakumanCount > 0 || yakumanCount > 0) {
         let title = doubleYakumanCount > 0 ? "ダブル役満！" : "役満！";
         let scoreText = doubleYakumanCount > 0 ? `${doubleYakumanCount * 96000}点 (親)` : `${yakumanCount * 48000}点 (親)`;
@@ -857,7 +784,6 @@ function judgeYaku(huResult, isTsumo) {
         
         endGame(`${totalHan}飜 - ${limitName}和了`, yakuList, `${score}点 (親)`);
     } else {
-        // 通常手の判定をすり抜けた役なし不聴など
         endGame("和了", ["役がありません（役なし）"], "0点");
     }
 }
@@ -869,7 +795,6 @@ function endGame(title, yaku, score) {
     document.getElementById('result-screen').style.display = 'flex';
 }
 
-// 起動
 initGame();
 </script>
 </body>
