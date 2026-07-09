@@ -5,21 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>素数麻雀 - テスト版</title>
     <style>
+        /* --- 🖥️ デフォルトスタイル（PC版ベース：どっしり大画面） --- */
         * { box-sizing: border-box; }
         body {
             background-color: #222;
             color: #fff;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
-            overflow: hidden; /* スクロールを禁止してアプリ感を出す */
+            min-height: 100vh;
         }
         
-        /* 📱 【追加】縦画面の時のアラート表示 */
+        /* タイトル表示 */
+        h1 { 
+            margin-top: 0;
+            margin-bottom: 15px; 
+            color: #4caf50; 
+            font-size: 28px;
+            text-shadow: 0 0 10px rgba(76,175,80,0.3);
+        }
+
+        /* 縦画面の時のスマホ用アラート（PCでは非表示） */
         #orientation-alert {
             display: none;
             position: fixed;
@@ -28,75 +37,73 @@
             flex-direction: column; justify-content: center; align-items: center;
             text-align: center; padding: 20px;
         }
-        @media (orientation: portrait) {
+        @media (max-width: 767px) and (orientation: portrait) {
             #orientation-alert { display: flex; }
         }
 
-        /* 🔄 画面全体のコンテナ（縦幅100vhにぴったり収める） */
+        /* ゲーム卓メインコンテナ */
         #game-container {
             background-color: #0d5f3a;
-            border: 6px solid #5d4037;
-            border-radius: 8px;
-            width: 100vw;
-            max-width: 960px;
-            height: 100vh;
-            max-height: 540px; /* 広がりすぎ防止 */
-            padding: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            border: 10px solid #5d4037;
+            border-radius: 10px;
+            width: 900px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
         }
 
         .area {
-            padding: 4px 8px;
+            margin-bottom: 20px;
+            padding: 10px;
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: 5px;
             background-color: rgba(0,0,0,0.2);
         }
         .area-title {
-            font-size: 11px;
+            font-size: 12px;
             color: #aaa;
-            margin-bottom: 2px;
+            margin-bottom: 5px;
         }
         .river {
             display: flex;
             flex-wrap: wrap;
-            gap: 3px;
-            min-height: 38px;
+            gap: 5px;
+            min-height: 60px;
             background-color: rgba(0,0,0,0.3);
-            padding: 3px;
+            padding: 5px;
         }
         .hand {
             display: flex;
-            gap: 3px;
-            min-height: 46px;
+            gap: 5px;
+            min-height: 70px;
             align-items: center;
         }
         
-        /* 🀄️ 牌のデザイン（画面の高さに合わせてレスポンシブに縮小） */
+        /* 🀄️ PC版の牌デザイン */
         .tile {
-            width: 5.2vh;
-            max-width: 42px;
-            height: 7.5vh;
-            max-height: 60px;
+            width: 45px;
+            height: 65px;
             background-color: #f5f5f5;
             border: 2px solid #ccc;
-            border-radius: 4px;
+            border-radius: 5px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: grab;
             user-select: none;
-            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            font-size: 3.8vh;
+            box-shadow: 2px 2px 3px rgba(0,0,0,0.3);
+            transition: transform 0.1s, background-color 0.1s;
+            font-size: 28px;
             font-weight: bold;
-            touch-action: none; /* スマホのデフォルトスクロールやズームを無効化 */
+            touch-action: none; /* スマホの誤スクロール防止 */
         }
         .tile:active { cursor: grabbing; }
+        .tile:hover {
+            transform: translateY(-5px);
+            background-color: #fff;
+        }
         
-        /* カラー指定 */
+        /* 牌の文字色 */
         .tile[data-suit="m"] { color: #e53935; } 
         .tile[data-suit="s"] { color: #4caf50; } 
         .tile[data-suit="p"] { color: #1e88e5; } 
@@ -104,17 +111,17 @@
         .tile[data-suit="z"][data-val="6"] { color: #4caf50; } /* 發 */
         .tile[data-suit="z"][data-val="7"] { color: #e53935; } /* 中 */
 
-        /* 待ち牌表示用のミニ牌デザイン */
+        /* 待ち牌表示用のミニ牌 */
         .machi-tile {
-            width: 24px;
-            height: 34px;
+            width: 32px;
+            height: 46px;
             background-color: #f5f5f5;
             border: 1px solid #ccc;
-            border-radius: 3px;
+            border-radius: 4px;
             display: inline-flex;
             justify-content: center;
             align-items: center;
-            font-size: 16px;
+            font-size: 20px;
             font-weight: bold;
             box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
@@ -124,44 +131,49 @@
         .machi-tile[data-suit="z"] { color: #333333; }
 
         /* CPUの伏せ牌 */
-        .tile.cpu-back {
-            background-color: #1565c0;
-            border-color: #0d47a1;
-        }
+        .tile.cpu-back { background-color: #1565c0; border-color: #0d47a1; cursor: default; }
+        .tile.cpu-back:hover { transform: none; background-color: #1565c0; }
         
-        /* コントロールボタンエリア */
+        /* アクションボタン */
         #controls {
+            margin-top: 15px;
             display: flex;
-            gap: 6px;
-            height: 32px;
+            gap: 10px;
+            height: 40px;
         }
         button {
-            flex: 1;
-            font-size: 13px;
+            padding: 5px 15px;
+            font-size: 16px;
             font-weight: bold;
             background-color: #4caf50;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
         }
-        button:disabled {
-            background-color: #444;
-            color: #777;
-        }
+        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
         
-        /* インフォパネル（コンパクト化） */
+        /* 情報パネル */
         #info-panel {
-            font-size: 12px;
+            margin-top: 10px;
+            font-size: 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             width: 100%;
             background-color: rgba(0,0,0,0.4);
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 10px;
+            border-radius: 5px;
         }
-        
+        #machi-box {
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 4px;
+            min-width: 200px;
+        }
+        #status-text { color: #ffeb3b; max-width: 400px; font-size: 14px; }
+        .deck-margin { margin-top: 3px; }
+
         /* リザルト画面 */
         #result-screen {
             position: absolute;
@@ -172,68 +184,117 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
-            border-radius: 8px;
+            border-radius: 10px;
         }
         #result-content {
             background: #333;
-            padding: 20px;
+            padding: 30px;
             border-radius: 10px;
             border: 2px solid #4caf50;
             text-align: center;
-            max-width: 400px;
-            font-size: 14px;
+            max-width: 500px;
         }
+        .meld-container { display: flex; gap: 2px; margin-left: 15px; border-left: 2px dashed #aaa; padding-left: 5px; }
         
-        .meld-container {
-            display: flex;
-            gap: 1px;
-            margin-left: 8px;
-            border-left: 2px dashed #aaa;
-            padding-left: 4px;
+        /* ドラッグ＆隙間ガイド線（共通） */
+        .tile.dragging { opacity: 0.3; }
+        .tile.drag-over-left { border-left: 5px solid #ffeb3b !important; padding-left: 0px; }
+        .tile.drag-over-right { border-right: 5px solid #ffeb3b !important; padding-right: 0px; }
+
+
+        /* --- 📱 スマホ横画面用のスタイル上書き（縦幅が狭い環境で自動発動） --- */
+        @media (max-height: 600px) and (orientation: landscape) {
+            body { padding: 0; justify-content: center; height: 100vh; overflow: hidden; }
+            h1 { display: none; } /* スマホ横画面ではタイトルを隠して縦幅節約 */
+            
+            #game-container {
+                border: 6px solid #5d4037;
+                border-radius: 8px;
+                width: 100vw;
+                max-width: 960px;
+                height: 100vh;
+                max-height: 540px;
+                padding: 6px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            .area { margin-bottom: 0; padding: 4px 8px; }
+            .area-title { font-size: 11px; margin-bottom: 2px; }
+            .river { gap: 3px; min-height: 38px; padding: 3px; }
+            .hand { gap: 3px; min-height: 46px; }
+            
+            /* 牌を画面の高さ(vh)に合わせてレスポンシブ縮小 */
+            .tile {
+                width: 5.2vh; max-width: 42px;
+                height: 7.5vh; max-height: 60px;
+                font-size: 3.8vh;
+                box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            }
+            .tile:hover { transform: none; background-color: #f5f5f5; } /* スマホでの化け防止 */
+            .machi-tile { width: 24px; height: 34px; font-size: 16px; border-radius: 3px; }
+            
+            .cpu-title-margin, .player-title-margin { margin-top: 2px !important; }
+            .deck-margin { margin-top: 0 !important; margin-left: 10px; display: inline-block; }
+
+            #controls { margin-top: 0; gap: 6px; height: 32px; }
+            button { flex: 1; padding: 0; font-size: 13px; border-radius: 4px; }
+            #info-panel { margin-top: 0; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
+            #machi-box { padding: 2px 5px; min-width: auto; }
+            #status-text { font-size: 12px; }
+            #result-content { padding: 20px; max-width: 400px; font-size: 14px; }
+            .meld-container { margin-left: 8px; padding-left: 4px; }
+            .tile.drag-over-left { border-left-width: 4px !important; }
+            .tile.drag-over-right { border-right-width: 4px !important; }
         }
-        
-        /* ドラッグ＆隙間インジケーター */
-        .tile.dragging { opacity: 0.2; }
-        .tile.drag-over-left { border-left: 4px solid #ffeb3b !important; }
-        .tile.drag-over-right { border-right: 4px solid #ffeb3b !important; }
     </style>
 </head>
 <body>
 
+<!-- 縦画面時の警告レイヤー（スマホのみ） -->
 <div id="orientation-alert">
     <div style="font-size: 40px; margin-bottom: 10px;">🔄</div>
     <h2>画面を「横向き」にしてください</h2>
     <p style="color: #aaa; font-size: 14px;">このゲームは横画面専用です。</p>
 </div>
 
+<!-- PC版でのみ引き立つタイトル -->
+<h1>素数麻雀 - テスト版</h1>
+
 <div id="game-container">
+    <!-- CPU Area -->
     <div class="area">
         <div class="area-title">CPU河</div>
         <div id="cpu-river" class="river"></div>
-        <div class="area-title" style="margin-top:2px;">CPU手牌</div>
+        <div class="area-title cpu-title-margin" style="margin-top:5px;">CPU手牌</div>
         <div id="cpu-hand" class="hand"></div>
     </div>
 
+    <!-- Info Panel -->
     <div id="info-panel">
         <div>
-            <div>東局 (あなた:親) <span style="color:#ff5722; font-weight:bold;">⚠️2飜縛り</span> | <span id="deck-count">山札: --</span></div>
+            <div>場風: 東局 (あなた: 親) <span style="color:#ff5722; font-weight:bold; margin-left:5px;">⚠️ 2飜縛り</span></div>
+            <div id="deck-count-container" class="deck-margin"><span id="deck-count">山札残り: 136枚</span></div>
         </div>
-        <div id="machi-box"><strong>待ち:</strong> --</div>
-        <div id="status-text" style="color: #ffeb3b;">あなたの番です。</div>
+        <div id="machi-box">
+            <div><strong>待ち牌:</strong> 打牌後に計算</div>
+        </div>
+        <div id="status-text">あなたの番です。</div>
     </div>
 
+    <!-- Player Area -->
     <div class="area">
-        <div class="area-title">プレイヤー手牌（ドラッグで隙間に挿入 / ダブルクリック・2回タップで打牌）</div>
-        <div style="display:flex; align-items:flex-end; justify-content: space-between;">
-            <div style="display:flex; align-items:flex-end;">
-                <div id="player-hand" class="hand"></div>
-                <div id="player-melds" class="hand"></div>
-            </div>
-        </div>
-        <div class="area-title" style="margin-top:2px;">プレイヤー河</div>
+        <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
+        <div class="area-title player-title-margin" style="margin-top:5px;">プレイヤー手牌 (光る隙間にドロップして挿入 / ダブルクリック・2回タップで打牌)</div>
+        <div style="display:flex; align-items:flex-end;">
+            <div id="player-hand" class="hand"></div>
+            <div id="player-melds" class="hand" style="margin-left:10px;"></div>
+        </div>
     </div>
 
+    <!-- Controls -->
     <div id="controls">
         <button id="btn-tsumo" disabled onclick="actionTsumo()">ツモ</button>
         <button id="btn-ron" disabled onclick="actionRon()">ロン</button>
@@ -243,12 +304,13 @@
         <button id="btn-pass" disabled onclick="actionPass()">パス</button>
     </div>
 
+    <!-- Result Screen -->
     <div id="result-screen">
         <div id="result-content">
-            <h2 id="result-title" style="color:#ffeb3b; margin:0 0 10px 0;">和了！</h2>
-            <div id="result-yaku" style="margin: 10px 0; text-align:left; max-height:120px; overflow-y:auto;"></div>
+            <h2 id="result-title" style="color:#ffeb3b; margin-top:0;">和了！</h2>
+            <div id="result-yaku" style="margin: 15px 0; text-align:left; max-height:120px; overflow-y:auto;"></div>
             <h3 id="result-score" style="color:#ff5722; margin:10px 0;"></h3>
-            <button onclick="location.reload()" style="background-color:#2196f3; padding: 6px 20px; width:auto; flex:none;">もう一度遊ぶ</button>
+            <button onclick="location.reload()" style="background-color:#2196f3; padding: 6px 20px;">もう一度遊ぶ</button>
         </div>
     </div>
 </div>
@@ -273,21 +335,21 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- ドラッグ＆ドロップ (PC/スマホ両対応・直感隙間判定) ---
+// --- ドラッグ＆ドロップ (PCドラッグ＆スマホタッチ両対応・隙間直感判定) ---
 let draggedTileIndex = null;
-let lastTapTime = 0; // スマホ用ダブルタップ擬似実装用
+let lastTapTime = 0; // スマホ擬似ダブルタップ用
 
 function addDragAndDropListeners() {
     const handTiles = document.querySelectorAll('#player-hand .tile');
     handTiles.forEach(tile => {
-        // PC用
+        // PC用イベント
         tile.addEventListener('dragstart', handleDragStart);
         tile.addEventListener('dragover', handleDragOver);
         tile.addEventListener('dragleave', handleDragLeave);
         tile.addEventListener('drop', handleDrop);
         tile.addEventListener('dragend', handleDragEnd);
 
-        // 📱 スマホ用タッチイベント
+        // スマホ用タッチイベント
         tile.addEventListener('touchstart', handleTouchStart, {passive: false});
         tile.addEventListener('touchmove', handleTouchMove, {passive: false});
         tile.addEventListener('touchend', handleTouchEnd);
@@ -324,11 +386,11 @@ function handleDrop(e) {
 }
 function handleDragEnd() { this.classList.remove('dragging'); clearDragStyles(); draggedTileIndex = null; }
 
-// --- 📱 スマホ用タッチ処理（指の下にある要素をリアルタイム判定） ---
+// --- スマホ用タッチ処理 ---
 function handleTouchStart(e) {
     if (currentTurn !== 'player') return;
     
-    // ⚡️ スマホ用ダブルタップ（打牌）の検知
+    // ⚡️ ダブルタップ（打牌）判定
     let currentTime = new Date().getTime();
     let tapLength = currentTime - lastTapTime;
     if (tapLength < 300 && tapLength > 0) {
@@ -345,16 +407,13 @@ function handleTouchStart(e) {
 
 function handleTouchMove(e) {
     if (draggedTileIndex === null) return;
-    e.preventDefault(); // スクロールを止める
+    e.preventDefault(); 
     
     let touch = e.touches[0];
-    // 指の座標にある要素を取得
     let target = document.elementFromPoint(touch.clientX, touch.clientY);
-    
     clearDragStyles();
     if (!target) return;
     
-    // 手牌のタイルに重なっているかチェック
     let tile = target.closest('#player-hand .tile');
     if (tile && tile.getAttribute('data-index') !== draggedTileIndex) {
         let rect = tile.getBoundingClientRect();
@@ -373,19 +432,17 @@ function handleTouchEnd(e) {
     
     let touch = e.changedTouches[0];
     let target = document.elementFromPoint(touch.clientX, touch.clientY);
-    
     if (target) {
         let tile = target.closest('#player-hand .tile');
         if (tile && tile.getAttribute('data-index') !== draggedTileIndex) {
             executeInsertion(tile, touch.clientX);
         }
     }
-    
     clearDragStyles();
     draggedTileIndex = null;
 }
 
-// --- ⚙️ 共通：挿入ロジック ---
+// --- 共通：牌の隙間挿入処理 ---
 function executeInsertion(targetTile, clientX) {
     const sourceIdx = parseInt(draggedTileIndex);
     let targetIdx = parseInt(targetTile.getAttribute('data-index'));
@@ -399,9 +456,7 @@ function executeInsertion(targetTile, clientX) {
     if (sourceIdx === targetIdx || sourceIdx === targetIdx - 1) return;
 
     const [draggedTile] = playerHand.splice(sourceIdx, 1);
-    if (sourceIdx < targetIdx) {
-        targetIdx--;
-    }
+    if (sourceIdx < targetIdx) { targetIdx--; }
     playerHand.splice(targetIdx, 0, draggedTile);
 
     updateUI(); 
@@ -414,7 +469,7 @@ function clearDragStyles() {
     });
 }
 
-// --- 麻雀ロジック・素数判定 ---
+// --- 素数判定コア ---
 function isPrime(num) {
     if (num < 2) return false;
     for (let i = 2; i <= Math.sqrt(num); i++) { if (num % i === 0) return false; }
@@ -449,6 +504,7 @@ function checkNiSoChitoi(cards) {
     return false;
 }
 
+// --- 麻雀判定コア ---
 function sortHand(hand) {
     const suitOrder = { 'm': 1, 's': 2, 'p': 3, 'z': 4 };
     return hand.sort((a, b) => {
@@ -628,13 +684,14 @@ function updateMachiDisplay() {
             }
         }
         if (machiList.length > 0) {
-            machiBox.innerHTML = `<strong>待ち:</strong> ` + machiList.map(c => `<div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
-        } else { machiBox.innerHTML = `<strong>待ち:</strong> なし (役不足)`; }
+            let tilesHtml = machiList.map(c => `<div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
+            machiBox.innerHTML = `<div style="display:flex; align-items:center; gap:5px;"><strong>待ち牌:</strong> ${tilesHtml}</div>`;
+        } else { machiBox.innerHTML = `<div><strong>待ち牌:</strong> なし (ノーテン / 役不足)</div>`; }
     }
 }
 
 function updateUI() {
-    document.getElementById('deck-count').innerText = `山札: ${deck.length}枚`;
+    document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
     let handHtml = '';
     playerHand.forEach((card, index) => {
         handHtml += `<div class="tile" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileText(card)}</div>`;
@@ -692,7 +749,7 @@ function playerDiscard(index) {
     playerRiver.push(card); lastDiscardedCard = card; isIppatsu = false; 
     
     updateUI(); updateMachiDisplay(); disableAllButtons();
-    currentTurn = 'cpu'; document.getElementById('status-text').innerText = "CPU思考中...";
+    currentTurn = 'cpu'; document.getElementById('status-text').innerText = "CPUが思考中...";
     setTimeout(cpuTurn, 800);
 }
 
@@ -716,7 +773,7 @@ function checkPlayerReaction(card) {
     
     if (canRon || canPon || canKan) {
         document.getElementById('btn-pass').disabled = false;
-        document.getElementById('status-text').innerText = "鳴き・ロン選択";
+        document.getElementById('status-text').innerText = "CPUの捨て牌に対してアクション可能です。";
     } else { setTimeout(playerTsumo, 600); }
 }
 
@@ -724,7 +781,7 @@ function playerTsumo() {
     if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     currentTurn = 'player';
     let card = deck.splice(0, 1)[0]; playerHand.push(card); lastDrawCard = card; turnCount++;
-    document.getElementById('status-text').innerText = isRiichi ? "自動ツモ切り中" : "あなたの番";
+    document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたの番です。";
     updateUI(); checkPlayerTurnActions();
     if (isRiichi && document.getElementById('btn-tsumo').disabled) {
         setTimeout(() => { playerDiscard(playerHand.indexOf(card)); }, 800);
@@ -772,7 +829,7 @@ function judgeYaku(huResult, isTsumo) {
         let score = scoreTable[res.totalHan] || 48000;
         let ln = res.totalHan>=13?"数え役満 ":res.totalHan>=11?"三倍満 ":res.totalHan>=8?"倍満 ":res.totalHan>=6?"跳満 ":(res.totalHan>=4&&score>=11600)?"満貫 ":"";
         endGame(`${res.totalHan}飜 - ${ln}和了`, res.yakuList, `${score}点 (親)`);
-    } else { endGame("和了不可", ["2飜縛りを満たしていません"], "0点"); }
+    } else { endGame("和了不可", ["2飜縛りを満たしていません (役不足)"], "0点"); }
 }
 
 function endGame(title, yaku, score) {
