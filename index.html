@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>素数麻雀 - テストプレイ環境 (挿入ソート版)</title>
+    <title>素数麻雀 - テストプレイ環境 (直感挿入ソート版)</title>
     <style>
         body {
             background-color: #222;
@@ -68,6 +68,7 @@
             transition: transform 0.1s, background-color 0.1s;
             font-size: 28px;
             font-weight: bold;
+            box-sizing: border-box; /* 枠線を含めたサイズ計算 */
         }
         .tile:active { cursor: grabbing; }
         .tile:hover {
@@ -171,20 +172,26 @@
             border-left: 2px dashed #aaa;
             padding-left: 5px;
         }
+        
+        /* ドラッグ中のスタイル */
         .tile.dragging {
-            opacity: 0.4;
-            border: 2px dashed #ffeb3b;
+            opacity: 0.3;
         }
-        .tile.drag-over {
-            border: 2px solid #ffeb3b;
-            background-color: #fffdec;
-            transform: scale(1.05) translateY(-5px);
+        
+        /* 🀫 【追加】隙間を視覚化するインジケーター（境界線の強調） */
+        .tile.drag-over-left {
+            border-left: 5px solid #ffeb3b !important;
+            padding-left: 0px; 
+        }
+        .tile.drag-over-right {
+            border-right: 5px solid #ffeb3b !important;
+            padding-right: 0px;
         }
     </style>
 </head>
 <body>
 
-<h1>素数麻雀 テスト卓 (直感ソート＆2飜縛り版)</h1>
+<h1>素数麻雀 テスト卓 (直感ナビ＆2飜縛り版)</h1>
 <p>ルール：3桁の素数で順子！【操作：ドラッグで牌の間に挿入 / ダブルクリックで打牌】</p>
 
 <div id="game-container">
@@ -212,7 +219,7 @@
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
-        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (狙った牌の隙間にドロップして並び替え)</div>
+        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (光る隙間にドロップして挿入)</div>
         <div style="display:flex; align-items:flex-end;">
             <div id="player-hand" class="hand"></div>
             <div id="player-melds" class="hand" style="margin-left:10px;"></div>
@@ -260,7 +267,7 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- ドラッグ＆ドロップ (挿入ソート仕様) ---
+// --- ドラッグ＆ドロップ (直感的な左右半分・隙間判定仕様) ---
 let draggedTileIndex = null;
 
 function addDragAndDropListeners() {
@@ -268,7 +275,6 @@ function addDragAndDropListeners() {
     handTiles.forEach(tile => {
         tile.addEventListener('dragstart', handleDragStart);
         tile.addEventListener('dragover', handleDragOver);
-        tile.addEventListener('dragenter', handleDragEnter);
         tile.addEventListener('dragleave', handleDragLeave);
         tile.addEventListener('drop', handleDrop);
         tile.addEventListener('dragend', handleDragEnd);
@@ -283,20 +289,33 @@ function handleDragStart(e) {
     e.dataTransfer.effectAllowed = 'move';
 }
 
+// 🀫 【更新】マウスが牌の左右どちらにあるかでガイドラインを切り替える
 function handleDragOver(e) {
     if (e.preventDefault) e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    
+    if (this.getAttribute('data-index') === draggedTileIndex) return false;
+
+    // 牌の左端からの相対的なマウスX座標を算出
+    const rect = this.getBoundingClientRect();
+    const relativeX = e.clientX - rect.left;
+
+    // 左半分か右半分かでクラス（黄色い縦線）を出し分ける
+    if (relativeX < rect.width / 2) {
+        this.classList.add('drag-over-left');
+        this.classList.remove('drag-over-right');
+    } else {
+        this.classList.add('drag-over-right');
+        this.classList.remove('drag-over-left');
+    }
     return false;
 }
 
-function handleDragEnter(e) {
-    if (this.getAttribute('data-index') === draggedTileIndex) return;
-    this.classList.add('drag-over');
+function handleDragLeave(e) { 
+    this.classList.remove('drag-over-left', 'drag-over-right'); 
 }
 
-function handleDragLeave(e) { this.classList.remove('drag-over'); }
-
-// 🀫 【更新】入れ替えではなく、牌の「間」に挿入するロジック
+// 🀫 【更新】ドロップされた瞬間のマウスの位置から正確に「隙間」を計算して挿入
 function handleDrop(e) {
     e.stopPropagation();
     if (draggedTileIndex === null) return;
@@ -304,12 +323,26 @@ function handleDrop(e) {
 
     if (draggedTileIndex !== targetTileIndex) {
         const sourceIdx = parseInt(draggedTileIndex);
-        const targetIdx = parseInt(targetTileIndex);
+        let targetIdx = parseInt(targetTileIndex);
 
-        // 1. ドラッグした牌を元の位置から1枚抜き出す
+        // ドロップされた正確な位置を再度計算
+        const rect = this.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        
+        // 牌の右半分に落とされた場合は、ターゲットの「右側（インデックス+1）」を挿入先にする
+        if (relativeX > rect.width / 2) {
+            targetIdx = targetIdx + 1;
+        }
+
+        // 1. まずドラッグ中の牌を抜く
         const [draggedTile] = playerHand.splice(sourceIdx, 1);
         
-        // 2. ドロップ先のインデックス位置に直接挿入（これで周りが綺麗に押し出される）
+        // 2. 牌を抜いたことで後ろのインデックスがズレるのを補正
+        if (sourceIdx < targetIdx) {
+            targetIdx--;
+        }
+
+        // 3. 計算した正確な隙間に差し込む
         playerHand.splice(targetIdx, 0, draggedTile);
 
         updateUI(); 
@@ -320,10 +353,14 @@ function handleDrop(e) {
 
 function handleDragEnd(e) {
     this.classList.remove('dragging');
-    document.querySelectorAll('#player-hand .tile').forEach(tile => {
-        tile.classList.remove('drag-over');
-    });
+    clearDragStyles();
     draggedTileIndex = null;
+}
+
+function clearDragStyles() {
+    document.querySelectorAll('#player-hand .tile').forEach(tile => {
+        tile.classList.remove('drag-over-left', 'drag-over-right');
+    });
 }
 
 // --- 素数判定 ---
