@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>素数麻雀 - テストプレイ環境 (待ち牌表示版)</title>
+    <title>素数麻雀 - テストプレイ環境 (2飜縛り版)</title>
     <style>
         body {
             background-color: #222;
@@ -52,7 +52,7 @@
             align-items: center;
         }
         
-        /* --- 牌のシンプルなデザイン --- */
+        /*牌のデザイン*/
         .tile {
             width: 45px;
             height: 65px;
@@ -75,7 +75,7 @@
             background-color: #fff;
         }
         
-        /* 🎨 カラー指定（手牌・河用） */
+        /* カラー指定 */
         .tile[data-suit="m"] { color: #e53935; } 
         .tile[data-suit="s"] { color: #4caf50; } 
         .tile[data-suit="p"] { color: #1e88e5; } 
@@ -83,7 +83,7 @@
         .tile[data-suit="z"][data-val="6"] { color: #4caf50; } /* 發 */
         .tile[data-suit="z"][data-val="7"] { color: #e53935; } /* 中 */
 
-        /* 🀫 新しく追加：待ち牌表示用のミニ牌デザイン */
+        /* 待ち牌表示用のミニ牌デザイン */
         .machi-tile {
             width: 32px;
             height: 46px;
@@ -184,8 +184,8 @@
 </head>
 <body>
 
-<h1>素数麻雀 テスト卓 (シンプル・待ち牌表示版)</h1>
-<p>ルール：3つの数牌を並び替えて3桁の素数になれば順子！【操作：ドラッグで並び替え / ダブルクリックで打牌】</p>
+<h1>素数麻雀 テスト卓 (2飜縛り＆立直制限版)</h1>
+<p>ルール：3桁の素数で順子！【2飜縛り：立直以外の役がない状態でのリーチは禁止です】</p>
 
 <div id="game-container">
     <div class="area">
@@ -197,7 +197,7 @@
 
     <div id="info-panel">
         <div>
-            <div>場風: 東局 (あなた: 親)</div>
+            <div>場風: 東局 (あなた: 親) <span style="color:#ff5722; font-weight:bold; margin-left:10px;">⚠️ 2飜縛り</span></div>
             <div id="deck-count" style="margin-top: 3px;">山札残り: 136枚</div>
         </div>
         <div id="machi-box" style="background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 4px; min-width: 200px;">
@@ -209,7 +209,7 @@
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
-        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (ドラッグで自由に並び替え可能)</div>
+        <div class="area-title" style="margin-top:5px;">プレイヤー手牌 (ドラッグで並び替え / ダブルクリックで打牌)</div>
         <div style="display:flex; align-items:flex-end;">
             <div id="player-hand" class="hand"></div>
             <div id="player-melds" class="hand" style="margin-left:10px;"></div>
@@ -255,7 +255,7 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- ドラッグ＆ドロップ ロジック ---
+// --- ドラッグ＆ドロップ ---
 let draggedTileIndex = null;
 
 function addDragAndDropListeners() {
@@ -289,9 +289,7 @@ function handleDragEnter(e) {
     this.classList.add('drag-over');
 }
 
-function handleDragLeave(e) {
-    this.classList.remove('drag-over');
-}
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
 
 function handleDrop(e) {
     e.stopPropagation();
@@ -320,7 +318,7 @@ function handleDragEnd(e) {
     draggedTileIndex = null;
 }
 
-// --- 素数判定ロジック ---
+// --- 素数判定 ---
 function isPrime(num) {
     if (num < 2) return false;
     for (let i = 2; i <= Math.sqrt(num); i++) {
@@ -362,7 +360,7 @@ function checkNiSoChitoi(cards) {
     return false;
 }
 
-// --- 麻雀ロジック・アガリ判定 ---
+// --- 麻雀判定コア ---
 function sortHand(hand) {
     const suitOrder = { 'm': 1, 's': 2, 'p': 3, 'z': 4 };
     return hand.sort((a, b) => {
@@ -371,9 +369,7 @@ function sortHand(hand) {
     });
 }
 
-function countInArray(arr, val) {
-    return arr.filter(item => item === val).length;
-}
+function countInArray(arr, val) { return arr.filter(item => item === val).length; }
 
 function getNormalMelds(cards) {
     if (cards.length === 0) return [[]];
@@ -392,9 +388,7 @@ function getNormalMelds(cards) {
     if (first[0] !== 'z') {
         let type = first[0];
         let sameTypeIndices = [];
-        for(let i=1; i<cards.length; i++) {
-            if(cards[i][0] === type) sameTypeIndices.push(i);
-        }
+        for(let i=1; i<cards.length; i++) { if(cards[i][0] === type) sameTypeIndices.push(i); }
         for(let i=0; i<sameTypeIndices.length; i++) {
             for(let j=i+1; j<sameTypeIndices.length; j++) {
                 let idx1 = sameTypeIndices[i], idx2 = sameTypeIndices[j];
@@ -448,323 +442,64 @@ function checkHu(hand, melds = []) {
     return null;
 }
 
-// --- ゲーム進行システム ---
-function initGame() {
-    deck = [];
-    for (let suit of SUITS) {
-        let max = suit === 'z' ? 7 : 9;
-        for (let i = 1; i <= max; i++) {
-            for (let k = 0; k < 4; k++) deck.push(suit + i);
-        }
-    }
-    for (let i = deck.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-
-    playerHand = deck.splice(0, 14);
-    cpuHand = deck.splice(0, 13);
-    sortHand(playerHand);
-    
-    document.getElementById('machi-box').innerHTML = '<div><strong>待ち牌:</strong> 打牌後に計算</div>';
-    updateUI();
-    checkPlayerTurnActions();
-}
-
-function getTileText(code) {
-    let suit = code[0];
-    let val = code[1];
-    if (suit === 'z') return ZI_NAMES[val];
-    return val;
-}
-
-// 🀫 新しく追加：プレイヤーの待ち牌を裏で全探索して表示する関数
-function updateMachiDisplay() {
-    const machiBox = document.getElementById('machi-box');
-    
-    // プレイヤーの手牌が「打牌した直後（13枚, 10枚, 7枚など3n+1枚）」のときだけ計算する
-    if (playerHand.length % 3 === 1) {
-        let machiList = [];
-        
-        // 全34種類の牌のリストを作成
-        const allTiles = [];
-        for (let suit of ['m', 's', 'p']) {
-            for (let i = 1; i <= 9; i++) allTiles.push(suit + i);
-        }
-        for (let i = 1; i <= 7; i++) allTiles.push('z' + i);
-
-        // 1枚ずつ足してみてアガれるか（Huになるか）チェック
-        for (let tile of allTiles) {
-            if (checkHu([...playerHand, tile], playerMelds)) {
-                machiList.push(tile);
-            }
-        }
-
-        // 待ち牌が存在すればテンパイ表示、なければノーテン表示
-        if (machiList.length > 0) {
-            let tilesHtml = machiList.map(c => `
-                <div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>
-            `).join('');
-            machiBox.innerHTML = `<div style="display:flex; align-items:center; gap:5px;"><strong>待ち牌:</strong> ${tilesHtml}</div>`;
-        } else {
-            machiBox.innerHTML = `<div><strong>待ち牌:</strong> なし（ノーテン）</div>`;
-        }
-    }
-}
-
-function updateUI() {
-    document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
-    
-    let handHtml = '';
-    playerHand.forEach((card, index) => {
-        handHtml += `<div class="tile" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileText(card)}</div>`;
-    });
-    document.getElementById('player-hand').innerHTML = handHtml;
-
-    addDragAndDropListeners();
-
-    let meldsHtml = '';
-    playerMelds.forEach(m => {
-        meldsHtml += `<div class="meld-container">`;
-        m.cards.forEach(c => {
-            meldsHtml += `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`;
-        });
-        meldsHtml += `</div>`;
-    });
-    document.getElementById('player-melds').innerHTML = meldsHtml;
-
-    let cpuHtml = '';
-    cpuHand.forEach(() => { cpuHtml += `<div class="tile cpu-back"></div>`; });
-    document.getElementById('cpu-hand').innerHTML = cpuHtml;
-
-    document.getElementById('player-river').innerHTML = playerRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
-    document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
-}
-
-function checkPlayerTurnActions() {
-    let huResult = checkHu(playerHand, playerMelds);
-    document.getElementById('btn-tsumo').disabled = !huResult;
-    document.getElementById('btn-riichi').disabled = (playerMelds.length > 0 || isRiichi || playerHand.length !== 14);
-    
-    let canKan = false;
-    let unique = [...new Set(playerHand)];
-    unique.forEach(c => { if (countInArray(playerHand, c) === 4) canKan = true; });
-    playerMelds.forEach(m => { if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; });
-    document.getElementById('btn-kan').disabled = !canKan;
-}
-
-function playerDiscard(index) {
-    if (currentTurn !== 'player' || playerHand.length % 3 !== 2) return;
-    
-    let card = playerHand.splice(index, 1)[0];
-    playerRiver.push(card);
-    lastDiscardedCard = card;
-    isIppatsu = false; 
-    
-    updateUI();
-    updateMachiDisplay(); // 🀫 牌を捨てて13枚になった瞬間に待ち牌表示を更新
-    
-    disableAllButtons();
-    currentTurn = 'cpu';
-    document.getElementById('status-text').innerText = "CPUが思考中...";
-    setTimeout(cpuTurn, 800);
-}
-
-function cpuTurn() {
-    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
-    
-    let tsumo = deck.splice(0, 1)[0];
-    cpuHand.push(tsumo);
-    
-    let discardIdx = Math.floor(Math.random() * cpuHand.length);
-    let discardCard = cpuHand.splice(discardIdx, 1)[0];
-    cpuRiver.push(discardCard);
-    lastDiscardedCard = discardCard;
-    updateUI();
-
-    checkPlayerReaction(discardCard);
-}
-
-function checkPlayerReaction(card) {
-    let canRon = checkHu([...playerHand, card], playerMelds);
-    let canPon = countInArray(playerHand, card) >= 2;
-    let canKan = countInArray(playerHand, card) === 3; 
-
-    document.getElementById('btn-ron').disabled = !canRon;
-    document.getElementById('btn-pon').disabled = !canPon;
-    document.getElementById('btn-kan').disabled = !canKan;
-    
-    if (canRon || canPon || canKan) {
-        document.getElementById('btn-pass').disabled = false;
-        document.getElementById('status-text').innerText = "CPUの捨て牌に対してアクション可能です。";
-    } else {
-        setTimeout(playerTsumo, 600);
-    }
-}
-
-function playerTsumo() {
-    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
-    currentTurn = 'player';
-    let card = deck.splice(0, 1)[0];
-    playerHand.push(card); 
-    lastDrawCard = card;
-    turnCount++;
-    
-    document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたのツモ番です。牌の入れ替え、またはダブルクリックで打牌してください。";
-    updateUI();
-    checkPlayerTurnActions();
-    
-    // ※ ここでは updateMachiDisplay をあえて呼ばないことで、
-    // 直前の捨て牌時の待ち表示を維持し「待ち牌をツモれたかどうか」を見やすくしています。
-
-    if (isRiichi && document.getElementById('btn-tsumo').disabled) {
-        setTimeout(() => {
-            let idx = playerHand.indexOf(card);
-            playerDiscard(idx);
-        }, 800);
-    }
-}
-
-function disableAllButtons() {
-    ['btn-tsumo', 'btn-ron', 'btn-pon', 'btn-kan', 'btn-riichi', 'btn-pass'].forEach(id => {
-        document.getElementById(id).disabled = true;
-    });
-}
-
-function actionPass() {
-    disableAllButtons();
-    playerTsumo();
-}
-
-function actionRiichi() {
-    isRiichi = true;
-    isIppatsu = true;
-    document.getElementById('btn-riichi').disabled = true;
-    document.getElementById('status-text').innerText = "リーチしました！牌をダブルクリックして1枚捨ててください。";
-}
-
-function actionPon() {
-    disableAllButtons();
-    let card = lastDiscardedCard;
-    cpuRiver.pop();
-    playerHand.splice(playerHand.indexOf(card), 1);
-    playerHand.splice(playerHand.indexOf(card), 1);
-    playerMelds.push({type: 'pon', cards: [card, card, card]});
-    currentTurn = 'player';
-    updateUI();
-    document.getElementById('status-text').innerText = "ポンしました。牌をダブルクリックして1枚捨ててください。";
-}
-
-function actionKan() {
-    disableAllButtons();
-    let card = lastDiscardedCard;
-    if (currentTurn === 'cpu') {
-        cpuRiver.pop();
-        playerHand.splice(playerHand.indexOf(card), 1);
-        playerHand.splice(playerHand.indexOf(card), 1);
-        playerHand.splice(playerHand.indexOf(card), 1);
-        playerMelds.push({type: 'kan', cards: [card, card, card, card]});
-    } else {
-        if (countInArray(playerHand, card) === 4) {
-            playerHand = playerHand.filter(c => c !== card);
-            playerMelds.push({type: 'kan', cards: [card, card, card, card]});
-        } else {
-            playerHand.splice(playerHand.indexOf(card), 1);
-            let targetMeld = playerMelds.find(m => m.type === 'pon' && m.cards[0] === card);
-            targetMeld.type = 'kan';
-            targetMeld.cards.push(card);
-        }
-    }
-    isRinshan = true;
-    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
-    let rinshanCard = deck.splice(0, 1)[0];
-    playerHand.push(rinshanCard);
-    lastDrawCard = rinshanCard;
-    currentTurn = 'player';
-    updateUI();
-    checkPlayerTurnActions();
-    isRinshan = false;
-}
-
-function actionTsumo() {
-    let result = checkHu(playerHand, playerMelds);
-    judgeYaku(result, true);
-}
-
-function actionRon() {
-    let fullHand = [...playerHand, lastDiscardedCard];
-    let result = checkHu(fullHand, playerMelds);
-    judgeYaku(result, false);
-}
-
-function judgeYaku(huResult, isTsumo) {
+// 🛠️ 【新設】純粋に飜数と役のリストだけをシミュレーション計算する共通関数
+function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
     let yakuList = [];
     let totalHan = 0;
     let doubleYakumanCount = 0;
     let yakumanCount = 0;
 
-    if (!huResult) return;
+    if (!huResult) return { totalHan: 0, yakuList: [], yakumanCount: 0, doubleYakumanCount: 0 };
+    let sorted = sortHand([...hand]);
 
     if (huResult.type === 'kokushi13') { doubleYakumanCount++; yakuList.push("国士無双十三面待ち (ダブル役満)"); }
     else if (huResult.type === 'kokushi') { yakumanCount++; yakuList.push("国士無双 (役満)"); }
-    
     if (huResult.type === 'niso_chitoitsu') { totalHan += 2; yakuList.push("二素七対子 (2飜)"); }
     if (huResult.type === 'chitoitsu') { totalHan += 2; yakuList.push("七対子 (2飜)"); }
-
     if (turnCount === 1 && isTsumo) { yakumanCount++; yakuList.push("天和 (役満)"); }
 
     if (huResult.type === 'normal') {
-        let bestHan = -1;
-        let bestYaku = [];
-        let patternYakuman = 0;
-        let patternDoubleYakuman = 0;
+        let bestHan = -1; let bestYaku = []; let patternYakuman = 0; let patternDoubleYakuman = 0;
 
         huResult.patterns.forEach(pattern => {
-            let pYaku = [];
-            let pHan = 0;
-            let pYakuman = 0;
-            let pDoubleYakuman = 0;
-
-            let shuntsuCount = pattern.filter(m => m.type === 'shuntsu').length;
+            let pYaku = []; let pHan = 0; let pYakuman = 0; let pDoubleYakuman = 0;
             let koutsuCount = pattern.filter(m => m.type === 'koutsu').length;
             let kantsuCount = pattern.filter(m => m.type === 'kantsu').length;
             let totalAnkou = pattern.filter(m => (m.type === 'koutsu' || m.type === 'kantsu') && !playerMelds.some(pm => pm.cards[0] === m.cards[0])).length;
             let isMenzen = playerMelds.length === 0;
 
             if (isMenzen) {
-                let currentSuit = playerHand[0][0];
+                let currentSuit = sorted[0][0];
                 if (currentSuit !== 'z') {
                     let standardStr = "11123345678999";
-                    let handNums = [...playerHand].map(c => c[1]).sort().join('');
+                    let handNums = sorted.map(c => c[1]).sort().join('');
                     if (handNums === standardStr) { pDoubleYakuman++; pYaku.push("素九蓮宝燈 (ダブル役満)"); }
                 }
             }
-
             let shuntsuStrings = pattern.filter(m => m.type === 'shuntsu').map(m => m.cards.map(c => c[1]).sort().join(''));
             let hasRen1 = ["128","328","728","928"].every(s => shuntsuStrings.includes(s)); 
             let hasRen2 = ["119","319","719","919"].every(s => shuntsuStrings.includes(s)); 
-            if ((hasRen1 || hasRen2) && ['1','3','7','9'].includes(huResult.head[1]) && huResult.head[0] !== 'z') {
-                pDoubleYakuman++; pYaku.push("四素連星 (ダブル役満)");
-            }
-
+            if ((hasRen1 || hasRen2) && ['1','3','7','9'].includes(huResult.head[1]) && huResult.head[0] !== 'z') { pDoubleYakuman++; pYaku.push("四素連星 (ダブル役満)"); }
             if (totalAnkou === 4) { pYakuman++; pYaku.push("四暗刻 (役満)"); }
             if (kantsuCount === 4) { pYakuman++; pYaku.push("四槓子 (役満)"); }
             
-            let allTiles = [...playerHand, ...playerMelds.flatMap(m => m.cards)];
+            let allTiles = [];
+            pattern.forEach(m => allTiles.push(...m.cards));
+            allTiles.push(huResult.head, huResult.head);
+
             if (allTiles.every(c => c[0] === 'z')) { pYakuman++; pYaku.push("字一色 (役満)"); }
             if (allTiles.every(c => c[1] === '1' || c[1] === '9')) { pYakuman++; pYaku.push("清老頭 (役満)"); }
-            
             let sangenKoutsu = pattern.filter(m => m.cards[0].startsWith('z') && parseInt(m.cards[0][1]) >= 5).length;
             if (sangenKoutsu === 3) { pYakuman++; pYaku.push("大三元 (役満)"); }
-            
             let fonKoutsu = pattern.filter(m => m.cards[0].startsWith('z') && parseInt(m.cards[0][1]) <= 4).length;
             let fonHead = huResult.head.startsWith('z') && parseInt(huResult.head[1]) <= 4;
             if (fonKoutsu === 4) { pDoubleYakuman++; pYaku.push("大四喜 (ダブル役満)"); }
             else if (fonKoutsu === 3 && fonHead) { pYakuman++; pYaku.push("小四喜 (役満)"); }
 
+            // 飜数条件
             if (isMenzen && isTsumo) { pHan += 1; pYaku.push("門前自摸 (1飜)"); }
-            if (isRiichi) { pHan += 1; pYaku.push("立直 (1飜)"); }
-            if (isIppatsu) { pHan += 1; pYaku.push("一発 (1飜)"); }
+            if (customIsRiichi) { pHan += 1; pYaku.push("立直 (1飜)"); }
+            if (customIsRiichi && isIppatsu) { pHan += 1; pYaku.push("一発 (1飜)"); }
             if (isRinshan) { pHan += 1; pYaku.push("嶺上開花 (1飜)"); }
             if (deck.length === 0) { pHan += 1; pYaku.push(isTsumo ? "海底撈月 (1飜)" : "河底撈月 (1飜)"); }
             if (allTiles.every(c => c[0] !== 'z' && c[1] !== '1' && c[1] !== '9')) { pHan += 1; pYaku.push("断幺九 (1飜)"); }
@@ -776,7 +511,6 @@ function judgeYaku(huResult, isTsumo) {
             uniqueShuntsu.forEach(sc => { if (shuntsuCodes.filter(c => c === sc).length >= 2) doubleShuntsuCount++; });
             if (doubleShuntsuCount === 2 && isMenzen) { pHan += 3; pYaku.push("二盃口 (3飜)"); }
             else if (doubleShuntsuCount === 1 && isMenzen) { pHan += 1; pYaku.push("一盃口 (1飜)"); }
-
             if ((koutsuCount + kantsuCount) === 4 && !isMenzen) { pHan += 2; pYaku.push("対々和 (2飜)"); }
             if (totalAnkou === 3) { pHan += 2; pYaku.push("三暗刻 (2飜)"); }
             if (kantsuCount === 3) { pHan += 2; pYaku.push("三槓子 (2飜)"); }
@@ -810,28 +544,271 @@ function judgeYaku(huResult, isTsumo) {
 
             if (pDoubleYakuman > 0 || pYakuman > 0) {
                 if (pDoubleYakuman * 2 + pYakuman > patternDoubleYakuman * 2 + patternYakuman) {
-                    patternDoubleYakuman = pDoubleYakuman;
-                    patternYakuman = pYakuman;
-                    bestYaku = pYaku;
+                    patternDoubleYakuman = pDoubleYakuman; patternYakuman = pYakuman; bestYaku = pYaku;
                 }
-            } else if (pHan > bestHan) {
-                bestHan = pHan;
-                bestYaku = pYaku;
-            }
+            } else if (pHan > bestHan) { bestHan = pHan; bestYaku = pYaku; }
         });
 
-        yakumanCount += patternYakuman;
-        doubleYakumanCount += patternDoubleYakuman;
-        totalHan += bestHan;
-        yakuList = [...yakuList, ...bestYaku];
+        yakumanCount += patternYakuman; doubleYakumanCount += patternDoubleYakuman;
+        totalHan += bestHan; yakuList = [...yakuList, ...bestYaku];
     }
+    return { totalHan, yakuList, yakumanCount, doubleYakumanCount };
+}
+
+// --- ゲーム進行システム ---
+function initGame() {
+    deck = [];
+    for (let suit of SUITS) {
+        let max = suit === 'z' ? 7 : 9;
+        for (let i = 1; i <= max; i++) {
+            for (let k = 0; k < 4; k++) deck.push(suit + i);
+        }
+    }
+    for (let i = deck.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    playerHand = deck.splice(0, 14); cpuHand = deck.splice(0, 13);
+    sortHand(playerHand);
+    document.getElementById('machi-box').innerHTML = '<div><strong>待ち牌:</strong> 打牌後に計算</div>';
+    updateUI();
+    checkPlayerTurnActions();
+}
+
+function getTileText(code) {
+    let suit = code[0]; let val = code[1];
+    if (suit === 'z') return ZI_NAMES[val];
+    return val;
+}
+
+// 🀫 【更新】2飜縛りを満たせるアガリ牌だけを表示する待ち牌探索
+function updateMachiDisplay() {
+    const machiBox = document.getElementById('machi-box');
+    if (playerHand.length % 3 === 1) {
+        let machiList = [];
+        const allTiles = [];
+        for (let suit of ['m', 's', 'p']) { for (let i = 1; i <= 9; i++) allTiles.push(suit + i); }
+        for (let i = 1; i <= 7; i++) allTiles.push('z' + i);
+
+        for (let tile of allTiles) {
+            let testHand = [...playerHand, tile];
+            let huResult = checkHu(testHand, playerMelds);
+            if (huResult) {
+                // ツモ・ロンいずれかで2飜縛りを満たせるかチェック
+                let resTsumo = getHanAndYaku(testHand, huResult, true, isRiichi);
+                let resRon = getHanAndYaku(testHand, huResult, false, isRiichi);
+                if (resTsumo.yakumanCount > 0 || resTsumo.doubleYakumanCount > 0 || resTsumo.totalHan >= 2 ||
+                    resRon.yakumanCount > 0 || resRon.doubleYakumanCount > 0 || resRon.totalHan >= 2) {
+                    machiList.push(tile);
+                }
+            }
+        }
+        if (machiList.length > 0) {
+            let tilesHtml = machiList.map(c => `<div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
+            machiBox.innerHTML = `<div style="display:flex; align-items:center; gap:5px;"><strong>待ち牌:</strong> ${tilesHtml}</div>`;
+        } else {
+            machiBox.innerHTML = `<div><strong>待ち牌:</strong> なし (ノーテン / 役不足)</div>`;
+        }
+    }
+}
+
+function updateUI() {
+    document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
+    let handHtml = '';
+    playerHand.forEach((card, index) => {
+        handHtml += `<div class="tile" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" ondblclick="playerDiscard(${index})">${getTileText(card)}</div>`;
+    });
+    document.getElementById('player-hand').innerHTML = handHtml;
+    addDragAndDropListeners();
+
+    let meldsHtml = '';
+    playerMelds.forEach(m => {
+        meldsHtml += `<div class="meld-container">`;
+        m.cards.forEach(c => { meldsHtml += `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`; });
+        meldsHtml += `</div>`;
+    });
+    document.getElementById('player-melds').innerHTML = meldsHtml;
+
+    let cpuHtml = '';
+    cpuHand.forEach(() => { cpuHtml += `<div class="tile cpu-back"></div>`; });
+    document.getElementById('cpu-hand').innerHTML = cpuHtml;
+
+    document.getElementById('player-river').innerHTML = playerRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
+    document.getElementById('cpu-river').innerHTML = cpuRiver.map(c => `<div class="tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
+}
+
+// 🀫 【更新】2飜縛りと、立直単体制限の制御
+function checkPlayerTurnActions() {
+    let huResult = checkHu(playerHand, playerMelds);
+    let canTsumo = false;
+    if (huResult) {
+        let res = getHanAndYaku(playerHand, huResult, true, isRiichi);
+        if (res.yakumanCount > 0 || res.doubleYakumanCount > 0 || res.totalHan >= 2) canTsumo = true;
+    }
+    document.getElementById('btn-tsumo').disabled = !canTsumo;
+
+    // 🔍 制限ルール：どの牌を捨てても「立直以外の役」が残らないならリーチ不可
+    let canRiichi = false;
+    if (playerMelds.length === 0 && !isRiichi && playerHand.length === 14) {
+        const allTiles = [];
+        for (let suit of ['m', 's', 'p']) { for (let i = 1; i <= 9; i++) allTiles.push(suit + i); }
+        for (let i = 1; i <= 7; i++) allTiles.push('z' + i);
+
+        for (let i = 0; i < playerHand.length; i++) {
+            let tempHand = [...playerHand];
+            tempHand.splice(i, 1); // 1枚破棄してテンパイ想定の13枚にする
+            
+            for (let tile of allTiles) {
+                let testHand = [...tempHand, tile];
+                let hr = checkHu(testHand, playerMelds);
+                if (hr) {
+                    // ロン想定（立直も自摸も乗らない状態）で1飜以上あれば「別役あり」とみなす
+                    let resRon = getHanAndYaku(testHand, hr, false, false);
+                    if (resRon.yakumanCount > 0 || resRon.doubleYakumanCount > 0 || resRon.totalHan >= 1) {
+                        canRiichi = true; break;
+                    }
+                }
+            }
+            if (canRiichi) break;
+        }
+    }
+    document.getElementById('btn-riichi').disabled = !canRiichi;
+    
+    let canKan = false;
+    let unique = [...new Set(playerHand)];
+    unique.forEach(c => { if (countInArray(playerHand, c) === 4) canKan = true; });
+    playerMelds.forEach(m => { if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; });
+    document.getElementById('btn-kan').disabled = !canKan;
+}
+
+function playerDiscard(index) {
+    if (currentTurn !== 'player' || playerHand.length % 3 !== 2) return;
+    let card = playerHand.splice(index, 1)[0];
+    playerRiver.push(card);
+    lastDiscardedCard = card;
+    isIppatsu = false; 
+    
+    updateUI();
+    updateMachiDisplay(); 
+    
+    disableAllButtons();
+    currentTurn = 'cpu';
+    document.getElementById('status-text').innerText = "CPUが思考中...";
+    setTimeout(cpuTurn, 800);
+}
+
+function cpuTurn() {
+    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
+    let tsumo = deck.splice(0, 1)[0];
+    cpuHand.push(tsumo);
+    let discardIdx = Math.floor(Math.random() * cpuHand.length);
+    let discardCard = cpuHand.splice(discardIdx, 1)[0];
+    cpuRiver.push(discardCard);
+    lastDiscardedCard = discardCard;
+    updateUI();
+    checkPlayerReaction(discardCard);
+}
+
+// 🀫 【更新】ロンボタンの活性化に2飜縛りを適用
+function checkPlayerReaction(card) {
+    let fullHand = [...playerHand, card];
+    let huResult = checkHu(fullHand, playerMelds);
+    let canRon = false;
+    if (huResult) {
+        let res = getHanAndYaku(fullHand, huResult, false, isRiichi);
+        if (res.yakumanCount > 0 || res.doubleYakumanCount > 0 || res.totalHan >= 2) canRon = true;
+    }
+
+    let canPon = countInArray(playerHand, card) >= 2;
+    let canKan = countInArray(playerHand, card) === 3; 
+
+    document.getElementById('btn-ron').disabled = !canRon;
+    document.getElementById('btn-pon').disabled = !canPon;
+    document.getElementById('btn-kan').disabled = !canKan;
+    
+    if (canRon || canPon || canKan) {
+        document.getElementById('btn-pass').disabled = false;
+        document.getElementById('status-text').innerText = "CPUの捨て牌に対してアクション可能です。";
+    } else {
+        setTimeout(playerTsumo, 600);
+    }
+}
+
+function playerTsumo() {
+    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
+    currentTurn = 'player';
+    let card = deck.splice(0, 1)[0];
+    playerHand.push(card); 
+    lastDrawCard = card;
+    turnCount++;
+    
+    document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたのツモ番です。";
+    updateUI();
+    checkPlayerTurnActions();
+    
+    if (isRiichi && document.getElementById('btn-tsumo').disabled) {
+        setTimeout(() => { let idx = playerHand.indexOf(card); playerDiscard(idx); }, 800);
+    }
+}
+
+function disableAllButtons() {
+    ['btn-tsumo', 'btn-ron', 'btn-pon', 'btn-kan', 'btn-riichi', 'btn-pass'].forEach(id => {
+        document.getElementById(id).disabled = true;
+    });
+}
+
+function actionPass() { disableAllButtons(); playerTsumo(); }
+function actionRiichi() { isRiichi = true; isIppatsu = true; document.getElementById('btn-riichi').disabled = true; }
+
+function actionPon() {
+    disableAllButtons();
+    let card = lastDiscardedCard; cpuRiver.pop();
+    playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1);
+    playerMelds.push({type: 'pon', cards: [card, card, card]});
+    currentTurn = 'player'; updateUI();
+}
+
+function actionKan() {
+    disableAllButtons();
+    let card = lastDiscardedCard;
+    if (currentTurn === 'cpu') {
+        cpuRiver.pop();
+        playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1);
+        playerMelds.push({type: 'kan', cards: [card, card, card, card]});
+    } else {
+        if (countInArray(playerHand, card) === 4) {
+            playerHand = playerHand.filter(c => c !== card);
+            playerMelds.push({type: 'kan', cards: [card, card, card, card]});
+        } else {
+            playerHand.splice(playerHand.indexOf(card), 1);
+            let targetMeld = playerMelds.find(m => m.type === 'pon' && m.cards[0] === card);
+            targetMeld.type = 'kan'; targetMeld.cards.push(card);
+        }
+    }
+    isRinshan = true;
+    if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
+    let rinshanCard = deck.splice(0, 1)[0]; playerHand.push(rinshanCard); lastDrawCard = rinshanCard;
+    currentTurn = 'player'; updateUI(); checkPlayerTurnActions(); isRinshan = false;
+}
+
+function actionTsumo() { let result = checkHu(playerHand, playerMelds); judgeYaku(result, true); }
+function actionRon() { let fullHand = [...playerHand, lastDiscardedCard]; let result = checkHu(fullHand, playerMelds); judgeYaku(result, false); }
+
+// 🀫 【更新】和了画面への結果出力を2飜ベースに最適化
+function judgeYaku(huResult, isTsumo) {
+    if (!huResult) return;
+    let handForJudge = isTsumo ? [...playerHand] : [...playerHand, lastDiscardedCard];
+    let res = getHanAndYaku(handForJudge, huResult, isTsumo, isRiichi);
+    
+    let yakuList = res.yakuList; let totalHan = res.totalHan;
+    let yakumanCount = res.yakumanCount; let doubleYakumanCount = res.doubleYakumanCount;
 
     if (doubleYakumanCount > 0 || yakumanCount > 0) {
         let title = doubleYakumanCount > 0 ? "ダブル役満！" : "役満！";
-        let scoreText = doubleYakumanCount > 0 ? `${doubleYakumanCount * 96000}点 (親)` : `${yakumanCount * 48000}点 (親)`;
+        let scoreText = doubleYakumanCount > 0 ? `${doubleYakumanCount * 96000}点` : `${yakumanCount * 48000}点`;
         endGame(title, yakuList, scoreText);
-    } else if (totalHan > 0) {
-        let scoreTable = {1: 1500, 2: 2900, 3: 5800, 4: 11600, 5: 12000, 6: 18000, 7: 18000, 8: 24000, 9: 24000, 10: 24000, 11: 36000, 12: 36000};
+    } else if (totalHan >= 2) {
+        let scoreTable = {2: 2900, 3: 5800, 4: 11600, 5: 12000, 6: 18000, 7: 18000, 8: 24000, 9: 24000, 10: 24000, 11: 36000, 12: 36000};
         let score = scoreTable[totalHan] || 48000;
         let limitName = "";
         if (totalHan >= 13) { score = 48000; limitName = "数え役満 "; }
@@ -842,7 +819,7 @@ function judgeYaku(huResult, isTsumo) {
         
         endGame(`${totalHan}飜 - ${limitName}和了`, yakuList, `${score}点 (親)`);
     } else {
-        endGame("和了", ["役がありません（役なし）"], "0点");
+        endGame("和了不可", ["2飜縛りを満たしていません (役不足)"], "0点");
     }
 }
 
