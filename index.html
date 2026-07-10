@@ -1,3 +1,28 @@
+あ、なるほど！失礼しました。自動で止まったときだけじゃなくて、「自動ツモ切りがパラパラ進んでいる最中に、プレイヤーが自分のタイミングでポチッと止めて理牌（ソート）できるボタン」が欲しかったわけですね。
+
+さらに、ツモ・ロンなどのアクションが発生して画面が止まっているときも、そのまま手牌を並び替えられるようにし、役の判定にホンイツ（混一色）を追加しました！
+
+🛠️ 今回のアップデート内容
+「一時停止 / 再開」ボタンの追加
+
+リーチ中、自動ツモ切りが連続している間にこのボタンを押すと、ツモ切りのタイマーがストップしてゲームが一時停止します。
+
+一時停止中は「並び替え」ボタンが有効になり、手動でのドラッグ＆ドロップによる理牌も自由にできます。
+
+「再開」を押すと、再び自動ツモ切りが動き出します。ボタンを押しやすくするため、ツモ切りの間隔を少し長め（1.5秒）に調整しました。
+
+アクション発生時（ツモ・ロン・鳴き）の並び替え完全対応
+
+自分がツモった時（ツモ・カンができる時）や、CPUの打牌に対してロン・ポン・カンができる一時停止中も、「並び替え」ボタンが常に有効になります。
+
+役判定に「混一色（ホンイツ）」を実装
+
+手牌（と副露）が「1種類の数牌＋字牌」で構成されている場合、混一色（門前3飜 / 副露2飜）として正しく判定・計算されるようになりました。
+
+以下、修正をすべて反映した新しいコードです。
+
+素数麻雀Webプロトタイプ（手動一時停止＆ホンイツ実装版）
+HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -125,8 +150,8 @@
             height: 40px;
         }
         button {
-            padding: 5px 15px;
-            font-size: 16px;
+            padding: 5px 12px;
+            font-size: 15px;
             font-weight: bold;
             background-color: #4caf50;
             color: white;
@@ -135,6 +160,8 @@
             cursor: pointer;
         }
         button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        #btn-pause { background-color: #ff9800; } /* 一時停止ボタンはオレンジ色 */
+        #btn-pause:disabled { background-color: #555; }
         
         #info-panel {
             margin-top: 10px;
@@ -210,8 +237,8 @@
             .cpu-title-margin, .player-title-margin { margin-top: 2px !important; }
             .deck-margin { margin-top: 0 !important; margin-left: 10px; display: inline-block; }
 
-            #controls { margin-top: 0; gap: 6px; height: 32px; }
-            button { flex: 1; padding: 0; font-size: 13px; border-radius: 4px; }
+            #controls { margin-top: 0; gap: 4px; height: 32px; }
+            button { flex: 1; padding: 0; font-size: 12px; border-radius: 4px; }
             #info-panel { margin-top: 0; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
             #status-text { font-size: 12px; }
             #result-content { padding: 20px; max-width: 400px; font-size: 14px; }
@@ -232,7 +259,6 @@
 <h1>素数麻雀 - テスト版</h1>
 
 <div id="game-container">
-    <!-- CPU Area -->
     <div class="area">
         <div class="area-title">CPU河</div>
         <div id="cpu-river" class="river"></div>
@@ -240,7 +266,6 @@
         <div id="cpu-hand" class="hand"></div>
     </div>
 
-    <!-- Info Panel -->
     <div id="info-panel">
         <div>
             <div>場風: 東局 (あなた: 親) <span style="color:#ff5722; font-weight:bold; margin-left:5px;">⚠️ 2飜縛り</span></div>
@@ -249,7 +274,6 @@
         <div id="status-text">あなたの番です。</div>
     </div>
 
-    <!-- Player Area -->
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
@@ -260,17 +284,17 @@
         </div>
     </div>
 
-    <!-- Controls -->
     <div id="controls">
         <button id="btn-tsumo" disabled onclick="actionTsumo()">ツモ</button>
         <button id="btn-ron" disabled onclick="actionRon()">ロン</button>
         <button id="btn-pon" disabled onclick="actionPon()">ポン</button>
         <button id="btn-kan" disabled onclick="actionKan()">カン</button>
         <button id="btn-riichi" disabled onclick="actionRiichi()">リーチ</button>
+        <button id="btn-sort" disabled onclick="actionSort()">並び替え</button>
+        <button id="btn-pause" disabled onclick="actionPauseToggle()">一時停止</button>
         <button id="btn-pass" disabled onclick="actionPass()">パス</button>
     </div>
 
-    <!-- Result Screen -->
     <div id="result-screen">
         <div id="result-content">
             <h2 id="result-title" style="color:#ffeb3b; margin-top:0;">和了！</h2>
@@ -301,6 +325,10 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
+// 🛠️ 自動ツモ切り制御用変数
+let tsumoTimeoutId = null;
+let isManualPaused = false;
+
 // 答え合わせモード用状態管理変数
 let isVerificationMode = false;
 let verificationHand = [];
@@ -329,7 +357,8 @@ function addDragAndDropListeners() {
 }
 
 function handleDragStart(e) {
-    if (!isVerificationMode && currentTurn !== 'player') return; 
+    // 🛠️ 手動一時停止中、またはアクション待ちで止まっている間はドラッグ可能にする
+    if (!isVerificationMode && currentTurn !== 'player' && !isManualPaused && !isActionWaiting()) return; 
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
     e.dataTransfer.setData('text/plain', draggedTileIndex);
@@ -358,9 +387,9 @@ function handleDrop(e) {
 function handleDragEnd() { this.classList.remove('dragging'); clearDragStyles(); draggedTileIndex = null; }
 
 function handleTouchStart(e) {
-    if (!isVerificationMode && currentTurn !== 'player') return;
+    if (!isVerificationMode && currentTurn !== 'player' && !isManualPaused && !isActionWaiting()) return;
     
-    if (!isVerificationMode) {
+    if (!isVerificationMode && !isManualPaused && !isActionWaiting()) {
         let currentTime = new Date().getTime();
         let tapLength = currentTime - lastTapTime;
         if (tapLength < 300 && tapLength > 0) {
@@ -438,7 +467,7 @@ function executeInsertion(targetTile, clientX) {
     }
 
     updateUI(); 
-    if (!isVerificationMode) {
+    if (!isVerificationMode && !isManualPaused && !isActionWaiting()) {
         checkPlayerTurnActions(); 
     }
 }
@@ -447,6 +476,14 @@ function clearDragStyles() {
     document.querySelectorAll('#player-hand .tile').forEach(tile => {
         tile.classList.remove('drag-over-left', 'drag-over-right');
     });
+}
+
+// 🛠️ アクション待ち（ツモ・ロンなどのボタンが出ている状態）かチェック
+function isActionWaiting() {
+    return !document.getElementById('btn-tsumo').disabled || 
+           !document.getElementById('btn-ron').disabled || 
+           !document.getElementById('btn-pon').disabled || 
+           !document.getElementById('btn-kan').disabled;
 }
 
 // --- 素数・麻雀ロジックコア ---
@@ -610,8 +647,20 @@ function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
             });
             if (hasSanshokuShuntsu) { pHan += 2; pYaku.push("三色同順 (2飜)"); }
 
+            // 🛠️ 清一色・混一色（ホンイツ）の判定
             let suitsPresent = new Set(allTiles.map(c => c[0]));
-            if (suitsPresent.size === 1 && !suitsPresent.has('z')) { pHan += isMenzen ? 6 : 5; pYaku.push(`清一色 (${isMenzen?6:5}飜)`); }
+            let hasZ = suitsPresent.has('z');
+            let numSuitsCount = [...suitsPresent].filter(s => s !== 'z').length;
+            if (numSuitsCount === 1) {
+                if (hasZ) {
+                    pHan += isMenzen ? 3 : 2; 
+                    pYaku.push(`混一色 (${isMenzen?3:2}飜)`);
+                } else {
+                    pHan += isMenzen ? 6 : 5; 
+                    pYaku.push(`清一色 (${isMenzen?6:5}飜)`);
+                }
+            }
+            
             if (allTiles.every(c => c[0] === 'z' || c[1] === '1' || c[1] === '9')) { pHan += 2; pYaku.push("混老頭 (2飜)"); }
 
             let sangenNames = {5:"白", 6:"發", 7:"中"};
@@ -634,6 +683,9 @@ function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
 function initGame() {
     deck = [];
     isVerificationMode = false;
+    isManualPaused = false;
+    if (tsumoTimeoutId) { clearTimeout(tsumoTimeoutId); tsumoTimeoutId = null; }
+    
     for (let suit of SUITS) {
         let max = suit === 'z' ? 7 : 9;
         for (let i = 1; i <= max; i++) { for (let k = 0; k < 4; k++) deck.push(suit + i); }
@@ -699,15 +751,36 @@ function checkPlayerTurnActions() {
     }
     document.getElementById('btn-riichi').disabled = !canRiichi;
     
-    // 🛠️ 【修正点】自分番でのカン（暗カン・加カン）は、リーチ中であっても行えるように制限を解除
     let canKan = false;
     [...new Set(playerHand)].forEach(c => { if (countInArray(playerHand, c) === 4) canKan = true; });
     playerMelds.forEach(m => { if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; });
     document.getElementById('btn-kan').disabled = !canKan;
+
+    // 🛠️ ボタンの有効・無効制御
+    if (isRiichi) {
+        // リーチ中で、ツモやカンなどのアクション待ちで止まっている間は「並び替え」を有効にする
+        if (!document.getElementById('btn-tsumo').disabled || !document.getElementById('btn-kan').disabled) {
+            document.getElementById('btn-sort').disabled = false;
+            document.getElementById('btn-pause').disabled = true; // アクション発生時は一時停止不要
+        } else {
+            // 自動ツモ切り進行中
+            document.getElementById('btn-sort').disabled = !isManualPaused; // 手動一時停止中のみソート可能
+        }
+    } else {
+        // 通常時はいつでもソート可能
+        document.getElementById('btn-sort').disabled = isVerificationMode;
+        document.getElementById('btn-pause').disabled = true;
+    }
 }
 
 function playerDiscard(index) {
     if (currentTurn !== 'player' || playerHand.length % 3 !== 2 || isVerificationMode) return;
+    
+    if (tsumoTimeoutId) { clearTimeout(tsumoTimeoutId); tsumoTimeoutId = null; }
+    isManualPaused = false;
+    document.getElementById('btn-pause').innerText = "一時停止";
+    document.getElementById('btn-pause').disabled = true;
+
     let card = playerHand.splice(index, 1)[0];
     playerRiver.push(card); lastDiscardedCard = card; isIppatsu = false; 
     
@@ -728,7 +801,6 @@ function checkPlayerReaction(card) {
     let huResult = checkHu([...playerHand, card], playerMelds);
     let canRon = huResult && getHanAndYaku([...playerHand, card], huResult, false, isRiichi).totalHan >= 2;
     
-    // 🛠️ 他家からの打牌（ポン・大明カン）は、リーチ中は引き続き完全に禁止
     let canPon = !isRiichi && (countInArray(playerHand, card) >= 2);
     let canKan = !isRiichi && (countInArray(playerHand, card) === 3); 
 
@@ -738,8 +810,13 @@ function checkPlayerReaction(card) {
     
     if (canRon || canPon || canKan) {
         document.getElementById('btn-pass').disabled = false;
+        document.getElementById('btn-sort').disabled = false; // 🛠️ ロンや鳴きが発生して止まっている間もソート可能
+        document.getElementById('btn-pause').disabled = true;
         document.getElementById('status-text').innerText = "CPUの捨て牌に対してアクション可能です。";
-    } else { setTimeout(playerTsumo, 600); }
+    } else { 
+        document.getElementById('btn-sort').disabled = !isRiichi; // リーチ中以外はソート可能
+        setTimeout(playerTsumo, 600); 
+    }
 }
 
 function playerTsumo() {
@@ -749,16 +826,50 @@ function playerTsumo() {
     document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたの番です。";
     updateUI(); checkPlayerTurnActions();
     
-    // 🛠️ 【修正点】リーチ中でも、ツモ和了（ツモボタン）または暗カン・加カン（カンボタン）ができる場合は、自動ツモ切りをストップして入力を待つように変更
     if (isRiichi && document.getElementById('btn-tsumo').disabled && document.getElementById('btn-kan').disabled) {
-        setTimeout(() => { playerDiscard(playerHand.indexOf(card)); }, 800);
+        // 🛠️ 自動ツモ切り進行中：一時停止ボタンを有効化し、1.5秒待ってからツモ切り
+        document.getElementById('btn-pause').disabled = false;
+        if (!isManualPaused) {
+            tsumoTimeoutId = setTimeout(() => { playerDiscard(playerHand.indexOf(card)); }, 1500);
+        } else {
+            // すでに一時停止状態ならそのまま待機
+            document.getElementById('btn-pause').innerText = "再開";
+            document.getElementById('btn-sort').disabled = false;
+            document.getElementById('status-text').innerText = "一時停止中...並び替えが可能です。";
+        }
     } else if (isRiichi && (!document.getElementById('btn-tsumo').disabled || !document.getElementById('btn-kan').disabled)) {
         document.getElementById('status-text').innerText = "リーチ中ですが、アクション可能です！";
     }
 }
 
+// 🛠️ 一時停止 / 再開 ボタンの切り替え処理
+function actionPauseToggle() {
+    if (isVerificationMode || !isRiichi) return;
+
+    if (!isManualPaused) {
+        // 一時停止する
+        isManualPaused = true;
+        if (tsumoTimeoutId) { clearTimeout(tsumoTimeoutId); tsumoTimeoutId = null; }
+        document.getElementById('btn-pause').innerText = "再開";
+        document.getElementById('btn-sort').disabled = false; // ソートボタン有効化
+        document.getElementById('status-text').innerText = "一時停止中...並び替えが可能です。";
+    } else {
+        // 再開する
+        isManualPaused = false;
+        document.getElementById('btn-pause').innerText = "一時停止";
+        document.getElementById('btn-sort').disabled = true;
+        document.getElementById('status-text').innerText = "リーチ中...自動ツモ切りします。";
+        
+        // 即座にツモ切りを実行
+        let card = lastDrawCard;
+        if (card && playerHand.includes(card)) {
+            tsumoTimeoutId = setTimeout(() => { playerDiscard(playerHand.indexOf(card)); }, 400);
+        }
+    }
+}
+
 function disableAllButtons() {
-    ['btn-tsumo', 'btn-ron', 'btn-pon', 'btn-kan', 'btn-riichi', 'btn-pass'].forEach(id => document.getElementById(id).disabled = true);
+    ['btn-tsumo', 'btn-ron', 'btn-pon', 'btn-kan', 'btn-riichi', 'btn-sort', 'btn-pause', 'btn-pass'].forEach(id => document.getElementById(id).disabled = true);
 }
 function actionPass() { disableAllButtons(); playerTsumo(); }
 function actionRiichi() { isRiichi = true; isIppatsu = true; document.getElementById('btn-riichi').disabled = true; }
@@ -774,8 +885,6 @@ function actionKan() {
         cpuRiver.pop(); playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1);
         playerMelds.push({type: 'kan', cards: [card, card, card, card]});
     } else {
-        // 自分のツモ番の場合（暗カン または 加カン）
-        // リーチ中でもここが正しく実行されます
         if (countInArray(playerHand, card) === 4) {
             playerHand = playerHand.filter(c => c !== card); playerMelds.push({type: 'kan', cards: [card, card, card, card]});
         } else {
@@ -786,6 +895,21 @@ function actionKan() {
     }
     isRinshan = true; if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     playerHand.push(deck.splice(0, 1)[0]); currentTurn = 'player'; updateUI(); checkPlayerTurnActions(); isRinshan = false;
+}
+
+// 🛠️ 並び替え（理牌）処理
+function actionSort() {
+    if (isVerificationMode) return;
+    sortHand(playerHand);
+    updateUI();
+    
+    // ソート直後にボタンの状態が崩れないよう再確認
+    if (playerHand.length % 3 === 2) {
+        checkPlayerTurnActions();
+    } else if (lastDiscardedCard && currentTurn === 'cpu') {
+        // CPUの打牌に対してアクション可能な一時停止中の状態を維持
+        document.getElementById('btn-sort').disabled = false;
+    }
 }
 
 // --- 答え合わせシステムロジック ---
@@ -990,5 +1114,4 @@ function endGame(title, yaku, score) {
 initGame();
 </script>
 </body>
-</html>
 </html>
