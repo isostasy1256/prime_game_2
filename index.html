@@ -421,21 +421,17 @@ function executeInsertion(targetTile, clientX) {
     if (relativeX > rect.width / 2) { targetIdx = targetIdx + 1; }
     if (sourceIdx === targetIdx || sourceIdx === targetIdx - 1) return;
     
-    // モードによって移動対象の配列を切り替える
     let targetArray = isVerificationMode ? verificationHand : playerHand;
     
     const [draggedTile] = targetArray.splice(sourceIdx, 1);
     if (sourceIdx < targetIdx) { targetIdx--; }
     targetArray.splice(targetIdx, 0, draggedTile);
     
-    // 選択中インデックスの位置のズレを補正する
     if (isVerificationMode && selectedIndices.length > 0) {
         let selectedCards = selectedIndices.map(i => targetArray[i === sourceIdx ? targetIdx : (i > sourceIdx && i <= targetIdx ? i - 1 : (i < sourceIdx && i >= targetIdx ? i + 1 : i))]);
-        // 現在の新しい並びから選択状態のインデックスを再取得
         selectedIndices = [];
         targetArray.forEach((c, idx) => {
             if (selectedCards.includes(c) && selectedIndices.length < selectedCards.length) {
-                // 重複牌がある場合、nullで消えていない生きている牌かつ、まだ登録してないインデックスを選ぶ
                 if (c !== null) selectedIndices.push(idx);
             }
         });
@@ -843,12 +839,11 @@ function updateVerificationUI() {
         } else {
             let isSelected = selectedIndices.includes(index);
             let selectClass = isSelected ? ' selected' : '';
-            // 検証中も draggable="true" を付与
             handHtml += `<div class="tile${selectClass}" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" onclick="handleVerificationClick(${index})">${getTileText(card)}</div>`;
         }
     });
     document.getElementById('player-hand').innerHTML = handHtml;
-    addDragAndDropListeners(); // ドラッグイベントを再適用
+    addDragAndDropListeners(); 
 }
 
 function handleVerificationClick(index) {
@@ -938,7 +933,14 @@ function checkSelectedMeld() {
         
         if (verificationMissCount >= 3) {
             isVerificationMode = false;
-            alert("❌ 答え合わせに3回失敗しました！和了は認められず、スルー扱いとなります。");
+            
+            // 💡 【修正点】すでに立直している場合はここで解除する
+            if (isRiichi) {
+                isRiichi = false;
+                alert("❌ 答え合わせに3回失敗しました！和了は認められず（チョンボ扱い）、立直が解除されました。");
+            } else {
+                alert("❌ 答え合わせに3回失敗しました！和了は認められず、スルー扱いとなります。");
+            }
             
             updateUI();
             
