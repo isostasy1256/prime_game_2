@@ -461,9 +461,10 @@ function checkPrimeShuntsu(c1, c2, c3) {
     if (c1[0] === 'z' || c2[0] === 'z' || c3[0] === 'z') return false;
     if (c1[0] !== c2[0] || c2[0] !== c3[0]) return false; 
     let v1 = parseInt(c1[1]), v2 = parseInt(c2[1]), v3 = parseInt(c3[1]);
+    
     let permutations = [
         v1*100 + v2*10 + v3, v1*100 + v3*10 + v2,
-        v2*100 + v1*10 + v3, v2*100 + v3*10 + v2,
+        v2*100 + v1*10 + v3, v2*100 + v3*10 + v1, 
         v3*100 + v1*10 + v2, v3*100 + v2*10 + v1
     ];
     return permutations.some(n => isPrime(n));
@@ -698,6 +699,7 @@ function checkPlayerTurnActions() {
     }
     document.getElementById('btn-riichi').disabled = !canRiichi;
     
+    // 🛠️ 【修正点】自分番でのカン（暗カン・加カン）は、リーチ中であっても行えるように制限を解除
     let canKan = false;
     [...new Set(playerHand)].forEach(c => { if (countInArray(playerHand, c) === 4) canKan = true; });
     playerMelds.forEach(m => { if (m.type === 'pon' && playerHand.includes(m.cards[0])) canKan = true; });
@@ -725,8 +727,10 @@ function cpuTurn() {
 function checkPlayerReaction(card) {
     let huResult = checkHu([...playerHand, card], playerMelds);
     let canRon = huResult && getHanAndYaku([...playerHand, card], huResult, false, isRiichi).totalHan >= 2;
-    let canPon = countInArray(playerHand, card) >= 2;
-    let canKan = countInArray(playerHand, card) === 3; 
+    
+    // 🛠️ 他家からの打牌（ポン・大明カン）は、リーチ中は引き続き完全に禁止
+    let canPon = !isRiichi && (countInArray(playerHand, card) >= 2);
+    let canKan = !isRiichi && (countInArray(playerHand, card) === 3); 
 
     document.getElementById('btn-ron').disabled = !canRon;
     document.getElementById('btn-pon').disabled = !canPon;
@@ -744,8 +748,12 @@ function playerTsumo() {
     let card = deck.splice(0, 1)[0]; playerHand.push(card); lastDrawCard = card; turnCount++;
     document.getElementById('status-text').innerText = isRiichi ? "リーチ中...自動ツモ切りします。" : "あなたの番です。";
     updateUI(); checkPlayerTurnActions();
-    if (isRiichi && document.getElementById('btn-tsumo').disabled) {
+    
+    // 🛠️ 【修正点】リーチ中でも、ツモ和了（ツモボタン）または暗カン・加カン（カンボタン）ができる場合は、自動ツモ切りをストップして入力を待つように変更
+    if (isRiichi && document.getElementById('btn-tsumo').disabled && document.getElementById('btn-kan').disabled) {
         setTimeout(() => { playerDiscard(playerHand.indexOf(card)); }, 800);
+    } else if (isRiichi && (!document.getElementById('btn-tsumo').disabled || !document.getElementById('btn-kan').disabled)) {
+        document.getElementById('status-text').innerText = "リーチ中ですが、アクション可能です！";
     }
 }
 
@@ -766,6 +774,8 @@ function actionKan() {
         cpuRiver.pop(); playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1); playerHand.splice(playerHand.indexOf(card), 1);
         playerMelds.push({type: 'kan', cards: [card, card, card, card]});
     } else {
+        // 自分のツモ番の場合（暗カン または 加カン）
+        // リーチ中でもここが正しく実行されます
         if (countInArray(playerHand, card) === 4) {
             playerHand = playerHand.filter(c => c !== card); playerMelds.push({type: 'kan', cards: [card, card, card, card]});
         } else {
@@ -934,7 +944,6 @@ function checkSelectedMeld() {
         if (verificationMissCount >= 3) {
             isVerificationMode = false;
             
-            // 💡 【修正点】すでに立直している場合はここで解除する
             if (isRiichi) {
                 isRiichi = false;
                 alert("❌ 答え合わせに3回失敗しました！和了は認められず（チョンボ扱い）、立直が解除されました。");
@@ -981,4 +990,5 @@ function endGame(title, yaku, score) {
 initGame();
 </script>
 </body>
+</html>
 </html>
