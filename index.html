@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>素数麻雀 - テスト版</title>
     <style>
-        /* --- 🖥️ デフォルトスタイル（PC版ベース：どっしり大画面） --- */
+        /* --- 🖥️ デフォルトスタイル（PC版ベース） --- */
         * { box-sizing: border-box; }
         body {
             background-color: #222;
@@ -19,7 +19,6 @@
             min-height: 100vh;
         }
         
-        /* タイトル表示 */
         h1 { 
             margin-top: 0;
             margin-bottom: 15px; 
@@ -28,7 +27,6 @@
             text-shadow: 0 0 10px rgba(76,175,80,0.3);
         }
 
-        /* 縦画面の時のスマホ用アラート（PCでは非表示） */
         #orientation-alert {
             display: none;
             position: fixed;
@@ -41,7 +39,6 @@
             #orientation-alert { display: flex; }
         }
 
-        /* ゲーム卓メインコンテナ */
         #game-container {
             background-color: #0d5f3a;
             border: 10px solid #5d4037;
@@ -79,7 +76,7 @@
             align-items: center;
         }
         
-        /* 🀄️ PC版の牌デザイン */
+        /* 🀄️ 牌デザイン */
         .tile {
             width: 45px;
             height: 65px;
@@ -95,23 +92,29 @@
             transition: transform 0.1s, background-color 0.1s;
             font-size: 28px;
             font-weight: bold;
-            touch-action: none; /* スマホの誤スクロール防止 */
+            touch-action: none;
         }
         .tile:active { cursor: grabbing; }
         .tile:hover {
             transform: translateY(-5px);
             background-color: #fff;
         }
+
+        /* ✨ 【追加】答え合わせモードで選択された牌のスタイル */
+        .tile.selected {
+            border: 3px solid #ffeb3b !important;
+            background-color: #fffde7 !important;
+            transform: translateY(-8px) !important;
+            box-shadow: 0 5px 10px rgba(255,235,59,0.4) !important;
+        }
         
-        /* 牌の文字色 */
         .tile[data-suit="m"] { color: #e53935; } 
         .tile[data-suit="s"] { color: #4caf50; } 
         .tile[data-suit="p"] { color: #1e88e5; } 
         .tile[data-suit="z"] { color: #333333; } 
-        .tile[data-suit="z"][data-val="6"] { color: #4caf50; } /* 發 */
-        .tile[data-suit="z"][data-val="7"] { color: #e53935; } /* 中 */
+        .tile[data-suit="z"][data-val="6"] { color: #4caf50; } 
+        .tile[data-suit="z"][data-val="7"] { color: #e53935; } 
 
-        /* 待ち牌表示用のミニ牌 */
         .machi-tile {
             width: 32px;
             height: 46px;
@@ -130,11 +133,9 @@
         .machi-tile[data-suit="p"] { color: #1e88e5; }
         .machi-tile[data-suit="z"] { color: #333333; }
 
-        /* CPUの伏せ牌 */
         .tile.cpu-back { background-color: #1565c0; border-color: #0d47a1; cursor: default; }
         .tile.cpu-back:hover { transform: none; background-color: #1565c0; }
         
-        /* アクションボタン */
         #controls {
             margin-top: 15px;
             display: flex;
@@ -153,7 +154,6 @@
         }
         button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
         
-        /* 情報パネル */
         #info-panel {
             margin-top: 10px;
             font-size: 16px;
@@ -174,7 +174,6 @@
         #status-text { color: #ffeb3b; max-width: 400px; font-size: 14px; }
         .deck-margin { margin-top: 3px; }
 
-        /* リザルト画面 */
         #result-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -196,16 +195,14 @@
         }
         .meld-container { display: flex; gap: 2px; margin-left: 15px; border-left: 2px dashed #aaa; padding-left: 5px; }
         
-        /* ドラッグ＆隙間ガイド線（共通） */
         .tile.dragging { opacity: 0.3; }
         .tile.drag-over-left { border-left: 5px solid #ffeb3b !important; padding-left: 0px; }
         .tile.drag-over-right { border-right: 5px solid #ffeb3b !important; padding-right: 0px; }
 
-
-        /* --- 📱 スマホ横画面用のスタイル上書き（縦幅が狭い環境で自動発動） --- */
+        /* --- 📱 スマホ横画面用のスタイル上書き --- */
         @media (max-height: 600px) and (orientation: landscape) {
             body { padding: 0; justify-content: center; height: 100vh; overflow: hidden; }
-            h1 { display: none; } /* スマホ横画面ではタイトルを隠して縦幅節約 */
+            h1 { display: none; } 
             
             #game-container {
                 border: 6px solid #5d4037;
@@ -225,14 +222,14 @@
             .river { gap: 3px; min-height: 38px; padding: 3px; }
             .hand { gap: 3px; min-height: 46px; }
             
-            /* 牌を画面の高さ(vh)に合わせてレスポンシブ縮小 */
             .tile {
                 width: 5.2vh; max-width: 42px;
                 height: 7.5vh; max-height: 60px;
                 font-size: 3.8vh;
                 box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
             }
-            .tile:hover { transform: none; background-color: #f5f5f5; } /* スマホでの化け防止 */
+            .tile:hover { transform: none; background-color: #f5f5f5; }
+            .tile.selected { transform: translateY(-4px) !important; }
             .machi-tile { width: 24px; height: 34px; font-size: 16px; border-radius: 3px; }
             
             .cpu-title-margin, .player-title-margin { margin-top: 2px !important; }
@@ -252,14 +249,12 @@
 </head>
 <body>
 
-<!-- 縦画面時の警告レイヤー（スマホのみ） -->
 <div id="orientation-alert">
     <div style="font-size: 40px; margin-bottom: 10px;">🔄</div>
     <h2>画面を「横向き」にしてください</h2>
     <p style="color: #aaa; font-size: 14px;">このゲームは横画面専用です。</p>
 </div>
 
-<!-- PC版でのみ引き立つタイトル -->
 <h1>素数麻雀 - テスト版</h1>
 
 <div id="game-container">
@@ -287,7 +282,7 @@
     <div class="area">
         <div class="area-title">プレイヤー河</div>
         <div id="player-river" class="river"></div>
-        <div class="area-title player-title-margin" style="margin-top:5px;">プレイヤー手牌 (光る隙間にドロップして挿入 / ダブルクリック・2回タップで打牌)</div>
+        <div class="area-title player-title-margin" style="margin-top:5px;">プレイヤー手牌</div>
         <div style="display:flex; align-items:flex-end;">
             <div id="player-hand" class="hand"></div>
             <div id="player-melds" class="hand" style="margin-left:10px;"></div>
@@ -335,37 +330,43 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// --- ドラッグ＆ドロップ (PCドラッグ＆スマホタッチ両対応・隙間直感判定) ---
+// 🧠 【追加】答え合わせモード用状態管理変数
+let isVerificationMode = false;
+let verificationHand = [];
+let selectedIndices = [];
+let verificationMissCount = 0;
+let verificationStep = 0;
+let verificationType = 'normal'; // 'normal' または 'chitoitsu'
+
+// --- ドラッグ＆ドロップ ---
 let draggedTileIndex = null;
-let lastTapTime = 0; // スマホ擬似ダブルタップ用
+let lastTapTime = 0; 
 
 function addDragAndDropListeners() {
+    if (isVerificationMode) return; // 🧠 答え合わせ中はドラッグ無効化
     const handTiles = document.querySelectorAll('#player-hand .tile');
     handTiles.forEach(tile => {
-        // PC用イベント
         tile.addEventListener('dragstart', handleDragStart);
         tile.addEventListener('dragover', handleDragOver);
         tile.addEventListener('dragleave', handleDragLeave);
         tile.addEventListener('drop', handleDrop);
         tile.addEventListener('dragend', handleDragEnd);
 
-        // スマホ用タッチイベント
         tile.addEventListener('touchstart', handleTouchStart, {passive: false});
         tile.addEventListener('touchmove', handleTouchMove, {passive: false});
         tile.addEventListener('touchend', handleTouchEnd);
     });
 }
 
-// --- PC用ドラッグ処理 ---
 function handleDragStart(e) {
-    if (currentTurn !== 'player') return; 
+    if (currentTurn !== 'player' || isVerificationMode) return; 
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
     e.dataTransfer.setData('text/plain', draggedTileIndex);
 }
 function handleDragOver(e) {
     if (e.preventDefault) e.preventDefault();
-    if (this.getAttribute('data-index') === draggedTileIndex) return false;
+    if (isVerificationMode || this.getAttribute('data-index') === draggedTileIndex) return false;
     const rect = this.getBoundingClientRect();
     const relativeX = e.clientX - rect.left;
     if (relativeX < rect.width / 2) {
@@ -380,17 +381,15 @@ function handleDragOver(e) {
 function handleDragLeave() { this.classList.remove('drag-over-left', 'drag-over-right'); }
 function handleDrop(e) {
     e.stopPropagation();
-    if (draggedTileIndex === null) return;
+    if (draggedTileIndex === null || isVerificationMode) return;
     executeInsertion(this, e.clientX);
     return false;
 }
 function handleDragEnd() { this.classList.remove('dragging'); clearDragStyles(); draggedTileIndex = null; }
 
-// --- スマホ用タッチ処理 ---
 function handleTouchStart(e) {
-    if (currentTurn !== 'player') return;
+    if (currentTurn !== 'player' || isVerificationMode) return;
     
-    // ⚡️ ダブルタップ（打牌）判定
     let currentTime = new Date().getTime();
     let tapLength = currentTime - lastTapTime;
     if (tapLength < 300 && tapLength > 0) {
@@ -406,7 +405,7 @@ function handleTouchStart(e) {
 }
 
 function handleTouchMove(e) {
-    if (draggedTileIndex === null) return;
+    if (draggedTileIndex === null || isVerificationMode) return;
     e.preventDefault(); 
     
     let touch = e.touches[0];
@@ -427,7 +426,7 @@ function handleTouchMove(e) {
 }
 
 function handleTouchEnd(e) {
-    if (draggedTileIndex === null) return;
+    if (draggedTileIndex === null || isVerificationMode) return;
     this.classList.remove('dragging');
     
     let touch = e.changedTouches[0];
@@ -442,23 +441,16 @@ function handleTouchEnd(e) {
     draggedTileIndex = null;
 }
 
-// --- 共通：牌の隙間挿入処理 ---
 function executeInsertion(targetTile, clientX) {
     const sourceIdx = parseInt(draggedTileIndex);
     let targetIdx = parseInt(targetTile.getAttribute('data-index'));
-
     const rect = targetTile.getBoundingClientRect();
     const relativeX = clientX - rect.left;
-    
-    if (relativeX > rect.width / 2) {
-        targetIdx = targetIdx + 1;
-    }
+    if (relativeX > rect.width / 2) { targetIdx = targetIdx + 1; }
     if (sourceIdx === targetIdx || sourceIdx === targetIdx - 1) return;
-
     const [draggedTile] = playerHand.splice(sourceIdx, 1);
     if (sourceIdx < targetIdx) { targetIdx--; }
     playerHand.splice(targetIdx, 0, draggedTile);
-
     updateUI(); 
     checkPlayerTurnActions(); 
 }
@@ -469,7 +461,7 @@ function clearDragStyles() {
     });
 }
 
-// --- 素数判定コア ---
+// --- 素数・麻雀ロジックコア ---
 function isPrime(num) {
     if (num < 2) return false;
     for (let i = 2; i <= Math.sqrt(num); i++) { if (num % i === 0) return false; }
@@ -477,6 +469,7 @@ function isPrime(num) {
 }
 
 function checkPrimeShuntsu(c1, c2, c3) {
+    if (!c1 || !c2 || !c3) return false;
     if (c1[0] === 'z' || c2[0] === 'z' || c3[0] === 'z') return false;
     if (c1[0] !== c2[0] || c2[0] !== c3[0]) return false; 
     let v1 = parseInt(c1[1]), v2 = parseInt(c2[1]), v3 = parseInt(c3[1]);
@@ -504,7 +497,6 @@ function checkNiSoChitoi(cards) {
     return false;
 }
 
-// --- 麻雀判定コア ---
 function sortHand(hand) {
     const suitOrder = { 'm': 1, 's': 2, 'p': 3, 'z': 4 };
     return hand.sort((a, b) => {
@@ -652,6 +644,7 @@ function getHanAndYaku(hand, huResult, isTsumo, customIsRiichi) {
 // --- ゲーム進行システム ---
 function initGame() {
     deck = [];
+    isVerificationMode = false;
     for (let suit of SUITS) {
         let max = suit === 'z' ? 7 : 9;
         for (let i = 1; i <= max; i++) { for (let k = 0; k < 4; k++) deck.push(suit + i); }
@@ -668,6 +661,7 @@ function initGame() {
 function getTileText(code) { return code[0] === 'z' ? ZI_NAMES[code[1]] : code[1]; }
 
 function updateMachiDisplay() {
+    if (isVerificationMode) return;
     const machiBox = document.getElementById('machi-box');
     if (playerHand.length % 3 === 1) {
         let machiList = []; const allTiles = [];
@@ -691,6 +685,8 @@ function updateMachiDisplay() {
 }
 
 function updateUI() {
+    if (isVerificationMode) { updateVerificationUI(); return; } // 🧠 検証中は専用UIに引き渡す
+
     document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
     let handHtml = '';
     playerHand.forEach((card, index) => {
@@ -713,6 +709,7 @@ function updateUI() {
 }
 
 function checkPlayerTurnActions() {
+    if (isVerificationMode) return;
     let huResult = checkHu(playerHand, playerMelds);
     let canTsumo = false;
     if (huResult) {
@@ -744,7 +741,7 @@ function checkPlayerTurnActions() {
 }
 
 function playerDiscard(index) {
-    if (currentTurn !== 'player' || playerHand.length % 3 !== 2) return;
+    if (currentTurn !== 'player' || playerHand.length % 3 !== 2 || isVerificationMode) return;
     let card = playerHand.splice(index, 1)[0];
     playerRiver.push(card); lastDiscardedCard = card; isIppatsu = false; 
     
@@ -816,12 +813,193 @@ function actionKan() {
     isRinshan = true; if (deck.length === 0) { endGame("流局", ["ノーテン"], 0); return; }
     playerHand.push(deck.splice(0, 1)[0]); currentTurn = 'player'; updateUI(); checkPlayerTurnActions(); isRinshan = false;
 }
+
+// 🧠 --- 答え合わせシステムロジック ---
+
 function actionTsumo() { judgeYaku(checkHu(playerHand, playerMelds), true); }
 function actionRon() { judgeYaku(checkHu([...playerHand, lastDiscardedCard], playerMelds), false); }
 
 function judgeYaku(huResult, isTsumo) {
     if (!huResult) return;
     let res = getHanAndYaku(isTsumo ? [...playerHand] : [...playerHand, lastDiscardedCard], huResult, isTsumo, isRiichi);
+    
+    if (res.yakumanCount === 0 && res.doubleYakumanCount === 0 && res.totalHan < 2) {
+        endGame("和了不可", ["2飜縛りを満たしていません (役不足)"], "0点");
+        return;
+    }
+
+    // 国士無双は面子構成がないため、検証をスキップして即和了
+    if (huResult.type === 'kokushi' || huResult.type === 'kokushi13') {
+        displayFinalResult(res, isTsumo);
+        return;
+    }
+
+    // 答え合わせフェーズ起動
+    startVerification(huResult, isTsumo);
+}
+
+function startVerification(huResult, isTsumo) {
+    isVerificationMode = true;
+    verificationMissCount = 0;
+    verificationStep = 0;
+    selectedIndices = [];
+    
+    verificationHand = isTsumo ? [...playerHand] : [...playerHand, lastDiscardedCard];
+    verificationType = (huResult.type === 'chitoitsu' || huResult.type === 'niso_chitoitsu') ? 'chitoitsu' : 'normal';
+    
+    disableAllButtons();
+    updateVerificationMessage();
+    updateVerificationUI();
+}
+
+function updateVerificationMessage() {
+    let activeTilesCount = verificationHand.filter(c => c !== null).length;
+    let msg = `<span style="color:#ffeb3b; font-weight:bold; font-size:15px;">【答え合わせ検証モード】</span><br>`;
+    
+    if (verificationType === 'normal') {
+        if (activeTilesCount > 2) {
+            msg += `手牌から正しい「面子(3枚)」を1組選んでください。`;
+        } else {
+            msg += `最後に、残った「雀頭(同じ牌2枚)」を選んでください。`;
+        }
+    } else {
+        msg += `「対子」または「二素対子(2枚)」を選んでください (${verificationStep + 1} / 7組目)`;
+    }
+    msg += `<br><span style="color:#ff5722; font-weight:bold;">お手つき制限: ${verificationMissCount} / 3 回</span>`;
+    document.getElementById('status-text').innerHTML = msg;
+}
+
+function updateVerificationUI() {
+    let handHtml = '';
+    verificationHand.forEach((card, index) => {
+        if (card === null) {
+            handHtml += `<div class="tile" style="opacity: 0; pointer-events: none;"></div>`;
+        } else {
+            let isSelected = selectedIndices.includes(index);
+            let selectClass = isSelected ? ' selected' : '';
+            handHtml += `<div class="tile${selectClass}" data-suit="${card[0]}" data-val="${card[1]}" onclick="handleVerificationClick(${index})">${getTileText(card)}</div>`;
+        }
+    });
+    document.getElementById('player-hand').innerHTML = handHtml;
+}
+
+function handleVerificationClick(index) {
+    if (!isVerificationMode) return;
+
+    if (selectedIndices.includes(index)) {
+        selectedIndices = selectedIndices.filter(i => i !== index);
+    } else {
+        let activeTilesCount = verificationHand.filter(c => c !== null).length;
+        let requiredCount = (verificationType === 'chitoitsu' || activeTilesCount === 2) ? 2 : 3;
+        
+        if (selectedIndices.length < requiredCount) {
+            selectedIndices.push(index);
+        }
+    }
+    updateVerificationUI();
+
+    let activeTilesCount = verificationHand.filter(c => c !== null).length;
+    let requiredCount = (verificationType === 'chitoitsu' || activeTilesCount === 2) ? 2 : 3;
+    
+    if (selectedIndices.length === requiredCount) {
+        setTimeout(checkSelectedMeld, 300); 
+    }
+}
+
+function checkSelectedMeld() {
+    let activeTilesCount = verificationHand.filter(c => c !== null).length;
+    let requiredCount = (verificationType === 'chitoitsu' || activeTilesCount === 2) ? 2 : 3;
+    if (selectedIndices.length !== requiredCount) return;
+
+    let selectedCards = selectedIndices.map(i => verificationHand[i]);
+    let remainingHand = [];
+    verificationHand.forEach((card, index) => {
+        if (card !== null && !selectedIndices.includes(index)) { remainingHand.push(card); }
+    });
+
+    let isCorrect = false;
+
+    if (verificationType === 'normal') {
+        if (requiredCount === 3) {
+            let c1 = selectedCards[0], c2 = selectedCards[1], c3 = selectedCards[2];
+            let isKoutsu = (c1 === c2 && c2 === c3);
+            let isShuntsu = checkPrimeShuntsu(c1, c2, c3);
+            if (isKoutsu || isShuntsu) {
+                // 選んだ3枚を抜いても、残りの手牌で整合性が保たれるか検証（パズル破綻防止）
+                if (checkHu(remainingHand, playerMelds)) { isCorrect = true; }
+            }
+        } else {
+            // 雀頭チェック
+            if (selectedCards[0] === selectedCards[1]) { isCorrect = true; }
+        }
+    } else {
+        // 七対子・二素七対子のチェック(2枚)
+        let c1 = selectedCards[0], c2 = selectedCards[1];
+        let isToitsu = (c1 === c2);
+        let isNiso = false;
+        if (c1[0] !== 'z' && c1[0] === c2[0]) {
+            let v1 = parseInt(c1[1]), v2 = parseInt(c2[1]);
+            if (isPrime(v1*10 + v2) || isPrime(v2*10 + v1)) { isNiso = true; }
+        }
+        if (isToitsu || isNiso) {
+            if (remainingHand.length === 0 || checkNiSoChitoi(sortHand([...remainingHand]))) {
+                isCorrect = true;
+            } else {
+                let counts = {}; remainingHand.forEach(t => counts[t] = (counts[t]||0)+1);
+                if (Object.values(counts).every(v => v === 2)) { isCorrect = true; }
+            }
+        }
+    }
+
+    if (isCorrect) {
+        selectedIndices.forEach(i => { verificationHand[i] = null; });
+        selectedIndices = [];
+        verificationStep++;
+
+        let nextActiveCount = verificationHand.filter(c => c !== null).length;
+        if (nextActiveCount === 0) {
+            // 💡 完全証明成功！点数計算へ進む
+            isVerificationMode = false;
+            let finalHu = checkHu(playerHand.length % 3 === 2 ? playerHand : [...playerHand, lastDiscardedCard], playerMelds);
+            let isTsumo = (playerHand.length % 3 === 2);
+            let res = getHanAndYaku(isTsumo ? [...playerHand] : [...playerHand, lastDiscardedCard], finalHu, isTsumo, isRiichi);
+            displayFinalResult(res, isTsumo);
+        } else {
+            updateVerificationMessage();
+            updateVerificationUI();
+        }
+    } else {
+        // ❌ 誤答ペナルティ
+        verificationMissCount++;
+        selectedIndices = [];
+        
+        if (verificationMissCount >= 3) {
+            // 3死：和了スルー処理
+            isVerificationMode = false;
+            alert("❌ 答え合わせに3回失敗しました！和了は認められず、スルー扱いとなります。");
+            
+            updateUI();
+            updateMachiDisplay();
+            
+            if (playerHand.length % 3 === 2) {
+                // ツモ失敗：14枚保持状態のまま通常打牌フェーズへ戻す
+                currentTurn = 'player';
+                document.getElementById('status-text').innerText = "和了不成立。手牌から安全な牌を1枚打牌してください。";
+                checkPlayerTurnActions();
+                document.getElementById('btn-tsumo').disabled = true; // このターンのツモは強制ロック
+            } else {
+                // ロン失敗：パス扱いとして次のCPUターンへ強制進行
+                actionPass();
+            }
+        } else {
+            alert("⚠️ 組み合わせが正しくないか、残りの手牌で整合性が取れなくなります！");
+            updateVerificationMessage();
+            updateVerificationUI();
+        }
+    }
+}
+
+function displayFinalResult(res, isTsumo) {
     if (res.yakumanCount > 0 || res.doubleYakumanCount > 0) {
         endGame(res.doubleYakumanCount > 0 ? "W役満！" : "役満！", res.yakuList, res.doubleYakumanCount > 0 ? `${res.doubleYakumanCount * 96000}点` : `${res.yakumanCount * 48000}点`);
     } else if (res.totalHan >= 2) {
@@ -829,7 +1007,7 @@ function judgeYaku(huResult, isTsumo) {
         let score = scoreTable[res.totalHan] || 48000;
         let ln = res.totalHan>=13?"数え役満 ":res.totalHan>=11?"三倍満 ":res.totalHan>=8?"倍満 ":res.totalHan>=6?"跳満 ":(res.totalHan>=4&&score>=11600)?"満貫 ":"";
         endGame(`${res.totalHan}飜 - ${ln}和了`, res.yakuList, `${score}点 (親)`);
-    } else { endGame("和了不可", ["2飜縛りを満たしていません (役不足)"], "0点"); }
+    }
 }
 
 function endGame(title, yaku, score) {
