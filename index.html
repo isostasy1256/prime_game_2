@@ -100,7 +100,7 @@
             background-color: #fff;
         }
 
-        /* ✨ 【追加】答え合わせモードで選択された牌のスタイル */
+        /* 答え合わせモードで選択された牌のスタイル */
         .tile.selected {
             border: 3px solid #ffeb3b !important;
             background-color: #fffde7 !important;
@@ -114,24 +114,6 @@
         .tile[data-suit="z"] { color: #333333; } 
         .tile[data-suit="z"][data-val="6"] { color: #4caf50; } 
         .tile[data-suit="z"][data-val="7"] { color: #e53935; } 
-
-        .machi-tile {
-            width: 32px;
-            height: 46px;
-            background-color: #f5f5f5;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px;
-            font-weight: bold;
-            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-        }
-        .machi-tile[data-suit="m"] { color: #e53935; }
-        .machi-tile[data-suit="s"] { color: #4caf50; }
-        .machi-tile[data-suit="p"] { color: #1e88e5; }
-        .machi-tile[data-suit="z"] { color: #333333; }
 
         .tile.cpu-back { background-color: #1565c0; border-color: #0d47a1; cursor: default; }
         .tile.cpu-back:hover { transform: none; background-color: #1565c0; }
@@ -165,13 +147,7 @@
             padding: 10px;
             border-radius: 5px;
         }
-        #machi-box {
-            background: rgba(0,0,0,0.3);
-            padding: 5px 15px;
-            border-radius: 4px;
-            min-width: 200px;
-        }
-        #status-text { color: #ffeb3b; max-width: 400px; font-size: 14px; }
+        #status-text { color: #ffeb3b; max-width: 500px; font-size: 14px; text-align: right; }
         .deck-margin { margin-top: 3px; }
 
         #result-screen {
@@ -230,7 +206,6 @@
             }
             .tile:hover { transform: none; background-color: #f5f5f5; }
             .tile.selected { transform: translateY(-4px) !important; }
-            .machi-tile { width: 24px; height: 34px; font-size: 16px; border-radius: 3px; }
             
             .cpu-title-margin, .player-title-margin { margin-top: 2px !important; }
             .deck-margin { margin-top: 0 !important; margin-left: 10px; display: inline-block; }
@@ -238,7 +213,6 @@
             #controls { margin-top: 0; gap: 6px; height: 32px; }
             button { flex: 1; padding: 0; font-size: 13px; border-radius: 4px; }
             #info-panel { margin-top: 0; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
-            #machi-box { padding: 2px 5px; min-width: auto; }
             #status-text { font-size: 12px; }
             #result-content { padding: 20px; max-width: 400px; font-size: 14px; }
             .meld-container { margin-left: 8px; padding-left: 4px; }
@@ -271,9 +245,6 @@
         <div>
             <div>場風: 東局 (あなた: 親) <span style="color:#ff5722; font-weight:bold; margin-left:5px;">⚠️ 2飜縛り</span></div>
             <div id="deck-count-container" class="deck-margin"><span id="deck-count">山札残り: 136枚</span></div>
-        </div>
-        <div id="machi-box">
-            <div><strong>待ち牌:</strong> 打牌後に計算</div>
         </div>
         <div id="status-text">あなたの番です。</div>
     </div>
@@ -330,20 +301,19 @@ let lastDiscardedCard = null;
 let currentTurn = 'player'; 
 let isRinshan = false;
 
-// 🧠 【追加】答え合わせモード用状態管理変数
+// 答え合わせモード用状態管理変数
 let isVerificationMode = false;
 let verificationHand = [];
 let selectedIndices = [];
 let verificationMissCount = 0;
 let verificationStep = 0;
-let verificationType = 'normal'; // 'normal' または 'chitoitsu'
+let verificationType = 'normal'; 
 
 // --- ドラッグ＆ドロップ ---
 let draggedTileIndex = null;
 let lastTapTime = 0; 
 
 function addDragAndDropListeners() {
-    if (isVerificationMode) return; // 🧠 答え合わせ中はドラッグ無効化
     const handTiles = document.querySelectorAll('#player-hand .tile');
     handTiles.forEach(tile => {
         tile.addEventListener('dragstart', handleDragStart);
@@ -359,14 +329,14 @@ function addDragAndDropListeners() {
 }
 
 function handleDragStart(e) {
-    if (currentTurn !== 'player' || isVerificationMode) return; 
+    if (!isVerificationMode && currentTurn !== 'player') return; 
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
     e.dataTransfer.setData('text/plain', draggedTileIndex);
 }
 function handleDragOver(e) {
     if (e.preventDefault) e.preventDefault();
-    if (isVerificationMode || this.getAttribute('data-index') === draggedTileIndex) return false;
+    if (this.getAttribute('data-index') === draggedTileIndex) return false;
     const rect = this.getBoundingClientRect();
     const relativeX = e.clientX - rect.left;
     if (relativeX < rect.width / 2) {
@@ -381,31 +351,33 @@ function handleDragOver(e) {
 function handleDragLeave() { this.classList.remove('drag-over-left', 'drag-over-right'); }
 function handleDrop(e) {
     e.stopPropagation();
-    if (draggedTileIndex === null || isVerificationMode) return;
+    if (draggedTileIndex === null) return;
     executeInsertion(this, e.clientX);
     return false;
 }
 function handleDragEnd() { this.classList.remove('dragging'); clearDragStyles(); draggedTileIndex = null; }
 
 function handleTouchStart(e) {
-    if (currentTurn !== 'player' || isVerificationMode) return;
+    if (!isVerificationMode && currentTurn !== 'player') return;
     
-    let currentTime = new Date().getTime();
-    let tapLength = currentTime - lastTapTime;
-    if (tapLength < 300 && tapLength > 0) {
-        let idx = parseInt(this.getAttribute('data-index'));
-        playerDiscard(idx);
-        e.preventDefault();
-        return;
+    if (!isVerificationMode) {
+        let currentTime = new Date().getTime();
+        let tapLength = currentTime - lastTapTime;
+        if (tapLength < 300 && tapLength > 0) {
+            let idx = parseInt(this.getAttribute('data-index'));
+            playerDiscard(idx);
+            e.preventDefault();
+            return;
+        }
+        lastTapTime = currentTime;
     }
-    lastTapTime = currentTime;
 
     draggedTileIndex = this.getAttribute('data-index');
     this.classList.add('dragging');
 }
 
 function handleTouchMove(e) {
-    if (draggedTileIndex === null || isVerificationMode) return;
+    if (draggedTileIndex === null) return;
     e.preventDefault(); 
     
     let touch = e.touches[0];
@@ -426,7 +398,7 @@ function handleTouchMove(e) {
 }
 
 function handleTouchEnd(e) {
-    if (draggedTileIndex === null || isVerificationMode) return;
+    if (draggedTileIndex === null) return;
     this.classList.remove('dragging');
     
     let touch = e.changedTouches[0];
@@ -448,11 +420,31 @@ function executeInsertion(targetTile, clientX) {
     const relativeX = clientX - rect.left;
     if (relativeX > rect.width / 2) { targetIdx = targetIdx + 1; }
     if (sourceIdx === targetIdx || sourceIdx === targetIdx - 1) return;
-    const [draggedTile] = playerHand.splice(sourceIdx, 1);
+    
+    // モードによって移動対象の配列を切り替える
+    let targetArray = isVerificationMode ? verificationHand : playerHand;
+    
+    const [draggedTile] = targetArray.splice(sourceIdx, 1);
     if (sourceIdx < targetIdx) { targetIdx--; }
-    playerHand.splice(targetIdx, 0, draggedTile);
+    targetArray.splice(targetIdx, 0, draggedTile);
+    
+    // 選択中インデックスの位置のズレを補正する
+    if (isVerificationMode && selectedIndices.length > 0) {
+        let selectedCards = selectedIndices.map(i => targetArray[i === sourceIdx ? targetIdx : (i > sourceIdx && i <= targetIdx ? i - 1 : (i < sourceIdx && i >= targetIdx ? i + 1 : i))]);
+        // 現在の新しい並びから選択状態のインデックスを再取得
+        selectedIndices = [];
+        targetArray.forEach((c, idx) => {
+            if (selectedCards.includes(c) && selectedIndices.length < selectedCards.length) {
+                // 重複牌がある場合、nullで消えていない生きている牌かつ、まだ登録してないインデックスを選ぶ
+                if (c !== null) selectedIndices.push(idx);
+            }
+        });
+    }
+
     updateUI(); 
-    checkPlayerTurnActions(); 
+    if (!isVerificationMode) {
+        checkPlayerTurnActions(); 
+    }
 }
 
 function clearDragStyles() {
@@ -660,32 +652,8 @@ function initGame() {
 
 function getTileText(code) { return code[0] === 'z' ? ZI_NAMES[code[1]] : code[1]; }
 
-function updateMachiDisplay() {
-    if (isVerificationMode) return;
-    const machiBox = document.getElementById('machi-box');
-    if (playerHand.length % 3 === 1) {
-        let machiList = []; const allTiles = [];
-        for (let suit of ['m', 's', 'p']) { for (let i = 1; i <= 9; i++) allTiles.push(suit + i); }
-        for (let i = 1; i <= 7; i++) allTiles.push('z' + i);
-
-        for (let tile of allTiles) {
-            let testHand = [...playerHand, tile]; let huResult = checkHu(testHand, playerMelds);
-            if (huResult) {
-                let resTsumo = getHanAndYaku(testHand, huResult, true, isRiichi);
-                let resRon = getHanAndYaku(testHand, huResult, false, isRiichi);
-                if (resTsumo.yakumanCount > 0 || resTsumo.doubleYakumanCount > 0 || resTsumo.totalHan >= 2 ||
-                    resRon.yakumanCount > 0 || resRon.doubleYakumanCount > 0 || resRon.totalHan >= 2) { machiList.push(tile); }
-            }
-        }
-        if (machiList.length > 0) {
-            let tilesHtml = machiList.map(c => `<div class="machi-tile" data-suit="${c[0]}" data-val="${c[1]}">${getTileText(c)}</div>`).join('');
-            machiBox.innerHTML = `<div style="display:flex; align-items:center; gap:5px;"><strong>待ち牌:</strong> ${tilesHtml}</div>`;
-        } else { machiBox.innerHTML = `<div><strong>待ち牌:</strong> なし (ノーテン / 役不足)</div>`; }
-    }
-}
-
 function updateUI() {
-    if (isVerificationMode) { updateVerificationUI(); return; } // 🧠 検証中は専用UIに引き渡す
+    if (isVerificationMode) { updateVerificationUI(); return; } 
 
     document.getElementById('deck-count').innerText = `山札残り: ${deck.length}枚`;
     let handHtml = '';
@@ -745,7 +713,7 @@ function playerDiscard(index) {
     let card = playerHand.splice(index, 1)[0];
     playerRiver.push(card); lastDiscardedCard = card; isIppatsu = false; 
     
-    updateUI(); updateMachiDisplay(); disableAllButtons();
+    updateUI(); disableAllButtons();
     currentTurn = 'cpu'; document.getElementById('status-text').innerText = "CPUが思考中...";
     setTimeout(cpuTurn, 800);
 }
@@ -814,7 +782,7 @@ function actionKan() {
     playerHand.push(deck.splice(0, 1)[0]); currentTurn = 'player'; updateUI(); checkPlayerTurnActions(); isRinshan = false;
 }
 
-// 🧠 --- 答え合わせシステムロジック ---
+// --- 答え合わせシステムロジック ---
 
 function actionTsumo() { judgeYaku(checkHu(playerHand, playerMelds), true); }
 function actionRon() { judgeYaku(checkHu([...playerHand, lastDiscardedCard], playerMelds), false); }
@@ -828,13 +796,11 @@ function judgeYaku(huResult, isTsumo) {
         return;
     }
 
-    // 国士無双は面子構成がないため、検証をスキップして即和了
     if (huResult.type === 'kokushi' || huResult.type === 'kokushi13') {
         displayFinalResult(res, isTsumo);
         return;
     }
 
-    // 答え合わせフェーズ起動
     startVerification(huResult, isTsumo);
 }
 
@@ -854,18 +820,18 @@ function startVerification(huResult, isTsumo) {
 
 function updateVerificationMessage() {
     let activeTilesCount = verificationHand.filter(c => c !== null).length;
-    let msg = `<span style="color:#ffeb3b; font-weight:bold; font-size:15px;">【答え合わせ検証モード】</span><br>`;
+    let msg = `<span style="color:#ffeb3b; font-weight:bold; font-size:15px;">【検証モード】</span> `;
     
     if (verificationType === 'normal') {
         if (activeTilesCount > 2) {
-            msg += `手牌から正しい「面子(3枚)」を1組選んでください。`;
+            msg += `正しい「面子(3枚)」を選んでください。`;
         } else {
-            msg += `最後に、残った「雀頭(同じ牌2枚)」を選んでください。`;
+            msg += `最後に「雀頭(同じ牌2枚)」を選んでください。`;
         }
     } else {
-        msg += `「対子」または「二素対子(2枚)」を選んでください (${verificationStep + 1} / 7組目)`;
+        msg += `「対子」または「二素対子(2枚)」選択 (${verificationStep + 1}/7組目)`;
     }
-    msg += `<br><span style="color:#ff5722; font-weight:bold;">お手つき制限: ${verificationMissCount} / 3 回</span>`;
+    msg += ` <span style="color:#ff5722; font-weight:bold; margin-left:10px;">お手つき: ${verificationMissCount}/3</span>`;
     document.getElementById('status-text').innerHTML = msg;
 }
 
@@ -877,10 +843,12 @@ function updateVerificationUI() {
         } else {
             let isSelected = selectedIndices.includes(index);
             let selectClass = isSelected ? ' selected' : '';
-            handHtml += `<div class="tile${selectClass}" data-suit="${card[0]}" data-val="${card[1]}" onclick="handleVerificationClick(${index})">${getTileText(card)}</div>`;
+            // 検証中も draggable="true" を付与
+            handHtml += `<div class="tile${selectClass}" data-suit="${card[0]}" data-val="${card[1]}" data-index="${index}" draggable="true" onclick="handleVerificationClick(${index})">${getTileText(card)}</div>`;
         }
     });
     document.getElementById('player-hand').innerHTML = handHtml;
+    addDragAndDropListeners(); // ドラッグイベントを再適用
 }
 
 function handleVerificationClick(index) {
@@ -925,15 +893,12 @@ function checkSelectedMeld() {
             let isKoutsu = (c1 === c2 && c2 === c3);
             let isShuntsu = checkPrimeShuntsu(c1, c2, c3);
             if (isKoutsu || isShuntsu) {
-                // 選んだ3枚を抜いても、残りの手牌で整合性が保たれるか検証（パズル破綻防止）
                 if (checkHu(remainingHand, playerMelds)) { isCorrect = true; }
             }
         } else {
-            // 雀頭チェック
             if (selectedCards[0] === selectedCards[1]) { isCorrect = true; }
         }
     } else {
-        // 七対子・二素七対子のチェック(2枚)
         let c1 = selectedCards[0], c2 = selectedCards[1];
         let isToitsu = (c1 === c2);
         let isNiso = false;
@@ -958,7 +923,6 @@ function checkSelectedMeld() {
 
         let nextActiveCount = verificationHand.filter(c => c !== null).length;
         if (nextActiveCount === 0) {
-            // 💡 完全証明成功！点数計算へ進む
             isVerificationMode = false;
             let finalHu = checkHu(playerHand.length % 3 === 2 ? playerHand : [...playerHand, lastDiscardedCard], playerMelds);
             let isTsumo = (playerHand.length % 3 === 2);
@@ -969,26 +933,21 @@ function checkSelectedMeld() {
             updateVerificationUI();
         }
     } else {
-        // ❌ 誤答ペナルティ
         verificationMissCount++;
         selectedIndices = [];
         
         if (verificationMissCount >= 3) {
-            // 3死：和了スルー処理
             isVerificationMode = false;
             alert("❌ 答え合わせに3回失敗しました！和了は認められず、スルー扱いとなります。");
             
             updateUI();
-            updateMachiDisplay();
             
             if (playerHand.length % 3 === 2) {
-                // ツモ失敗：14枚保持状態のまま通常打牌フェーズへ戻す
                 currentTurn = 'player';
                 document.getElementById('status-text').innerText = "和了不成立。手牌から安全な牌を1枚打牌してください。";
                 checkPlayerTurnActions();
-                document.getElementById('btn-tsumo').disabled = true; // このターンのツモは強制ロック
+                document.getElementById('btn-tsumo').disabled = true; 
             } else {
-                // ロン失敗：パス扱いとして次のCPUターンへ強制進行
                 actionPass();
             }
         } else {
